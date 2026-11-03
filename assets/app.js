@@ -1,6 +1,6 @@
 import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.180.0/build/three.module.js';
 import { DRIVE_MODES, TUNE_FIELDS, createVehicleState, tuneVehicle } from './physics.mjs';
-import { createGuardrailTrack, collideWithGuardrails, WALL_HEIGHT } from './guardrails.mjs';
+import { createGuardrailTrack, collideWithGuardrails, smoothClosedTrack, WALL_HEIGHT } from './guardrails.mjs';
 
 const $ = (id) => document.getElementById(id);
 const STORAGE_KEY = 'tinytorque-garage-v1'; // Migrates existing settings by individual field.
@@ -94,12 +94,16 @@ const path = new THREE.CatmullRomCurve3([
   [27,9], [13,36], [39,57], [49,78], [22,91], [-14,84],
   [-38,67], [-30,37], [-59,29], [-82,7], [-78,-29], [-53,-57], [-30,-72]
 ].map(([x,z]) => new THREE.Vector3(x,0,z)), true, 'catmullrom', 0.34);
-const track = Array.from({ length:POINT_COUNT }, (_,i) => path.getPointAt(i / POINT_COUNT));
+// A handful of original corners are sharper than the rail setback.
+// Round the whole closed loop before creating both the asphalt and the rails,
+// otherwise a tight inside rail folds across the track and traps the drivers.
+const rawTrack = Array.from({ length:POINT_COUNT }, (_,i) => path.getPointAt(i / POINT_COUNT));
+const track = smoothClosedTrack(rawTrack, 7).map(p => new THREE.Vector3(p.x,0,p.z));
 const tangents = Array.from({ length:POINT_COUNT }, (_,i) => {
   const a = track[wrap(i - 1)], b = track[wrap(i + 1)];
   return b.clone().sub(a).normalize();
 });
-const lengthOfTrack = path.getLength();
+const lengthOfTrack = track.reduce((length,p,i)=>length+p.distanceTo(track[wrap(i+1)]),0);
 const distancePerPoint = lengthOfTrack / POINT_COUNT;
 const guardrails = createGuardrailTrack(track, ROAD_WIDTH, 2.5);
 function pointWithOffset(index, offset = 0) {
