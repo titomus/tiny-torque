@@ -4,6 +4,7 @@ import { DRIVE_MODES, TUNE_FIELDS, createVehicleState, tuneVehicle } from './phy
 const $ = (id) => document.getElementById(id);
 const STORAGE_KEY = 'tinytorque-garage-v1'; // Migrates existing settings by individual field.
 const LAPS = 3;
+const RACE_LIMIT = 300;
 const ROAD_WIDTH = 12;
 const POINT_COUNT = 420;
 const STEP = 1 / 60;
@@ -22,7 +23,7 @@ const CAR_PRESETS = [
   },{
     name:'Nebula XR', code:'02 / VITESSE', color:'#66e6d6',
     chassis:{massFactor:1.04,wheelbase:3.5,frontWeight:.48,speedFactor:1.1,nativeGrip:.94,yawInertia:1.14,trackWidth:2.50,rollResist:.96},
-    tune:{power:145,topSpeed:39,gearing:.9,diffLock:.8,grip:.79,pressure:1.1,mass:106,cg:.57,suspension:.7,steering:.90,brakeBias:.55,aero:.7,aggression:1.1,drivetrain:'rwd'}
+    tune:{power:110,topSpeed:39,gearing:.9,diffLock:.35,grip:1.35,pressure:1,mass:106,cg:.33,suspension:1.05,steering:1.25,brakeBias:.65,aero:.7,aggression:.76,drivetrain:'rwd'}
   },{
     name:'Bumble R', code:'03 / ADHÉRENCE', color:'#f2d25f',
     chassis:{massFactor:.89,wheelbase:2.85,frontWeight:.61,speedFactor:.94,nativeGrip:1.12,yawInertia:.78,trackWidth:2.95,rollResist:1.14},
@@ -48,7 +49,7 @@ const cars = CAR_PRESETS.map((preset, index) => ({
   ...preset, id:index, tune:sanitizeTune(saved && saved[index], preset.tune),
   speed:0, index:0, lap:0, finished:false, finishedAt:0, heading:0,
   position:new THREE.Vector3(), visual:null, wheelParts:[], laneOffset:0, offroad:0,
-  physics:createVehicleState(),sector:0,rescueCount:0,stuckTime:0,slides:0,lastSlide:false,spinTime:0,penalty:0
+  physics:createVehicleState(),sector:0,rescueCount:0,stuckTime:0,slides:0,lastSlide:false,spinTime:0,penalty:0,dnf:false,dustCooldown:0
 }));
 function saveGarage() {
   try { localStorage.setItem(STORAGE_KEY, JSON.stringify(cars.map(car => car.tune))); } catch (_) { /* storage may be disabled */ }
@@ -272,6 +273,37 @@ function buildCar(car) {
 buildWorld();
 cars.forEach(buildCar);
 
+// Small reusable particle pool for grass dust and tire smoke.
+const dustGeo = new THREE.SphereGeometry(.67,6,4);
+const dustPool = Array.from({length:56},()=>{
+  const mesh=new THREE.Mesh(dustGeo,new THREE.MeshBasicMaterial({
+    color:'#c7bda9',transparent:true,opacity:0,depthWrite:false
+  }));
+  mesh.visible=false;
+  scene.add(mesh);
+  return {mesh,life:0,duration:.7};
+});
+let dustIndex=0;
+function emitDust(car) {
+  const dust=dustPool[dustIndex++%dustPool.length];
+  const p=car.physics;
+  dust.life=dust.duration=.48+Math.random()*.35;
+  dust.mesh.visible=true;
+  dust.mesh.material.color.set(car.offroad>.3?'#c7b38b':'#829096');
+  dust.mesh.position.set(p.x-p.vx*.085+(Math.random()-.5)*1.6,.4,p.z-p.vz*.085+(Math.random()-.5)*1.6);
+  dust.mesh.scale.setScalar(.5);
+}
+function updateDust(dt) {
+  for(const d of dustPool){
+    if(d.life<=0)continue;
+    d.life=Math.max(0,d.life-dt);
+    d.mesh.visible=d.life>0;
+    d.mesh.material.opacity=.34*(d.life/d.duration);
+    d.mesh.scale.setScalar(.6+(1-d.life/d.duration)*1.7);
+    d.mesh.position.y+=dt*.65;
+  }
+}
+
 function resetRace() {
   elapsed=0;
   timeAccumulator=0;
@@ -289,6 +321,8 @@ function resetRace() {
     car.slides=0;
     car.lastSlide=false;
     car.penalty=0;
+    car.dnf=false;
+    car.dustCooldown=0;
     car.laneOffset=i%2?1.75:-1.75;
     const p=pointWithOffset(car.index,car.laneOffset);
     const t=tangents[car.index];
@@ -330,7 +364,7 @@ function checkGates(car,previous,index) {
   const phys=car.physics;
   const p=track[index];
   const centerDistance=Math.hypot(phys.x-p.x,phys.z-p.z);
-  if(centerDistance>ROAD_WIDTH*.48 || car.offroad>.25) return;
+  if(centerDistance>ROAD_WIDTH*.72) return;
   const t=tangents[index];
   const forward=phys.vx*t.x+phys.vz*t.z;
   if(forward<2.8) return;
@@ -382,20 +416,31 @@ function drive(car,dt) {
     (Math.max(1,(look+Math.max(5,Math.floor(look/2)))*distancePerPoint));
   const pressure=1-1.15*(car.tune.pressure-1)**2;
   const effectiveGrip=Math.max(.35,car.tune.grip*car.chassis.nativeGrip*pressure);
-  const limitingSpeed=Math.sqrt(9.81*effectiveGrip/Math.max(.008,curve));
+  const limitingSpeed=Math.sqrt(7.3*effectiveGrip/Math.max(.008,curve));
   const possibleSpeed=car.tune.topSpeed*(1.32-.32*car.tune.gearing)*car.chassis.speedFactor;
-  const driverRisk=.74+.26*car.tune.aggression;
+  const driverRisk=.70+.23*car.tune.aggression;
   let desired=Math.min(possibleSpeed,limitingSpeed*driverRisk);
   if(car.offroad>.5) desired=Math.min(desired,Math.max(5,11-car.offroad*.35));
   if(Math.abs(drift)>.45) desired=Math.min(desired,Math.max(7,speed*.72));
   const speedError=desired-speed;
   const throttle=clamp(.18+speedError*.46,0,1);
   const brake=clamp(-speedError*.52,0,1);
+  // Driver-controlled traction management, not an invisible track-keeping force.
+  const driveAid=car.tune.drivetrain==='rwd'
+    ?clamp(1-Math.abs(steer)*.68-Math.abs(drift)*1.05,.07,1):1;
+  const safeThrottle=throttle*driveAid;
   const oldRollOver=p.rollOver;
-  tuneVehicle(p,car.tune,car.chassis,{steer,throttle,brake},car.offroad,dt);
+  tuneVehicle(p,car.tune,car.chassis,{steer,throttle:safeThrottle,brake},car.offroad,dt);
   car.position.set(p.x,0,p.z);
   car.heading=p.heading;
   car.speed=p.speed;
+  if(p.speed>6 && (car.offroad>.35 || p.slide)) {
+    car.dustCooldown-=dt;
+    if(car.dustCooldown<=0) {
+      emitDust(car);
+      car.dustCooldown=.16;
+    }
+  } else car.dustCooldown=0;
 
   if(p.slide&&!car.lastSlide)car.slides++;
   car.lastSlide=p.slide;
@@ -405,7 +450,7 @@ function drive(car,dt) {
   }
   if(car.offroad>4 && p.speed<3.0)car.stuckTime+=dt;
   else car.stuckTime=Math.max(0,car.stuckTime-dt*.5);
-  if(car.stuckTime>7 || car.offroad>38)rescueCar(car,index);
+  if(car.stuckTime>4 || car.offroad>18)rescueCar(car,index);
   else checkGates(car,previous,index);
   car.visual.position.set(car.position.x,.09+Math.sin(elapsed*12+car.id)*.018,car.position.z);
   car.visual.rotation.set(0,car.heading,clamp(p.roll*.09,-.22,.22));
@@ -415,6 +460,18 @@ function drive(car,dt) {
 function simulate(dt) {
   elapsed+=dt;
   cars.forEach(car=>drive(car,dt));
+  updateDust(dt);
+  if(elapsed>=RACE_LIMIT && mode==='running') {
+    cars.forEach(car=>{
+      if(!car.finished) {
+        car.finished=true;car.dnf=true;car.finishedAt=Infinity;car.speed=0;
+        car.physics.vx=0;car.physics.vz=0;
+      }
+    });
+    mode='finished';
+    toast('Temps limite atteint : les voitures restantes abandonnent.');
+    syncControls();
+  }
   // Simple impulse-based car contacts, without forcing cars back onto the circuit.
   for(let i=0;i<cars.length;i++)for(let j=i+1;j<cars.length;j++){
     const a=cars[i],b=cars[j];
@@ -438,7 +495,7 @@ function simulate(dt) {
 }
 function rankCars() {
   return [...cars].sort((a,b) => {
-    if (a.finished && b.finished) return a.finishedAt-b.finishedAt;
+    if (a.finished && b.finished) return a.finishedAt===b.finishedAt ? a.id-b.id : a.finishedAt-b.finishedAt;
     if (a.finished) return -1;
     if (b.finished) return 1;
     return (b.lap*POINT_COUNT+b.index) - (a.lap*POINT_COUNT+a.index);
@@ -493,7 +550,7 @@ function syncControls() {
 function updateDashboard() {
   const ordered = rankCars();
   $('leaderboard').innerHTML = ordered.map((car,position) => {
-    const detail = car.finished ? '<span class="leader-finish">' + lapTime(car.finishedAt) + '</span><br><small>TERMINÉ</small>' :
+    const detail = car.dnf ? '<span class="leader-finish">ABANDON</span><br><small>HORS CLASSEMENT</small>' : car.finished ? '<span class="leader-finish">' + lapTime(car.finishedAt) + '</span><br><small>TERMINÉ</small>' :
       '<span>' + Math.min(car.lap+1,LAPS) + ' / ' + LAPS + ' TOUR</span><br><small>' + Math.round(car.speed*3.6) + ' km/h</small>';
     return '<div class="leader-row ' + (car.id===selected?'is-selected':'') + '"><span class="leader-place">' + (position+1) + '</span>' +
       '<span class="leader-color" style="background:' + car.color + '"></span><span class="leader-name">' + car.name +
@@ -510,7 +567,7 @@ function updateDashboard() {
   if ($('tele-slip')) $('tele-slip').textContent = Math.round(Math.abs(slip)) + '°';
   if ($('tele-drive')) $('tele-drive').textContent = driveLabel;
   if ($('tele-warnings')) $('tele-warnings').textContent = car.slides + ' glissades · ' + car.physics.rollOver + ' tonneaux · ' + car.rescueCount + ' remises en piste';
-  $('tele-note').textContent = car.finished ? 'Voiture arrivée. Comparez son chrono aux autres.' :
+  $('tele-note').textContent = car.dnf ? 'Le temps limite est atteint : cette voiture abandonne.' : car.finished ? 'Voiture arrivée. Comparez son chrono aux autres.' :
     car.physics.rollOver>0 && car.physics.speed<5 ? 'Tonneau ! Le centre de gravité et la suspension influencent la stabilité.' :
     Math.abs(slip)>25 && car.speed>7 ? 'Dérapage important ! Les pneus glissent dans une autre direction que la carrosserie.' :
     car.offroad > 3 ? 'Attention : sortie de piste ! Essayez plus d’adhérence ou une direction moins nerveuse.' :
