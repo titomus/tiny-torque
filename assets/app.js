@@ -1,6 +1,7 @@
 import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.180.0/build/three.module.js';
 import { DRIVE_MODES, TUNE_FIELDS, createVehicleState, tuneVehicle } from './physics.mjs';
 import { createGuardrailTrack, collideWithGuardrails, smoothClosedTrack, WALL_HEIGHT } from './guardrails.mjs';
+import { TRACK_CONTROL_POINTS } from './track.mjs';
 
 const $ = (id) => document.getElementById(id);
 const STORAGE_KEY = 'tinytorque-garage-v1'; // Migrates existing settings by individual field.
@@ -89,11 +90,9 @@ const sun = new THREE.DirectionalLight(0xffefd3, 2.1);
 sun.position.set(-65, 110, 30);
 scene.add(sun);
 
-const path = new THREE.CatmullRomCurve3([
-  [-3,-75], [34,-73], [69,-58], [87,-31], [81,-2], [55,14],
-  [27,9], [13,36], [39,57], [49,78], [22,91], [-14,84],
-  [-38,67], [-30,37], [-59,29], [-82,7], [-78,-29], [-53,-57], [-30,-72]
-].map(([x,z]) => new THREE.Vector3(x,0,z)), true, 'catmullrom', 0.34);
+const path = new THREE.CatmullRomCurve3(
+  TRACK_CONTROL_POINTS.map(([x,z]) => new THREE.Vector3(x,0,z)), true, 'catmullrom', 0.34
+);
 // A handful of original corners are sharper than the rail setback.
 // Round the whole closed loop before creating both the asphalt and the rails,
 // otherwise a tight inside rail folds across the track and traps the drivers.
