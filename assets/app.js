@@ -408,6 +408,7 @@ function resetRace() {
   });
   syncControls();
   updateDashboard();
+  renderRecordBoard();
 }
 function closestTrackIndex(position,previous,fullSearch=false) {
   if (!fullSearch) return nearestIndex(position,previous,35);
