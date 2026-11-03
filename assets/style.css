@@ -7,3 +7,21 @@
 @media(max-width:1020px){.app{grid-template-columns:285px minmax(400px,1fr);grid-template-rows:auto auto;height:auto;min-height:100vh;overflow:visible}.sidepanel{grid-row:1 / 3}.main{height:76vh;min-height:590px}.results-panel{grid-column:2;min-height:300px;display:grid;grid-template-columns:1fr 1fr;gap:0 20px;overflow:visible;padding:0 22px}.results-top{grid-column:1 / -1;padding-top:16px}.leaderboard-top,.leaderboard{grid-column:1}.telemetry{grid-column:2;grid-row:2 / 4;align-self:start}.lab-note{display:none}.right-footer{grid-column:1 / -1}.race-timer{bottom:116px}}
 @media(max-width:690px){.app{display:flex;flex-direction:column}.sidepanel{order:2;padding:0 18px 23px;overflow:visible;border-right:0}.brand{height:67px}.side-heading{padding-top:20px}.car-list{grid-template-columns:repeat(4,minmax(0,1fr));gap:6px}.car-card{padding:8px 5px;min-height:90px}.car-art .car-top{transform:rotate(-12deg) skew(-9deg) scale(.68)}.car-art .wheels{transform:rotate(-12deg) scale(.68)}.car-name{font-size:13px}.car-number{font-size:8px}.main{order:1;height:67vh;min-height:480px}.topbar{height:56px;padding:0 16px}.topbar-right{font-size:8px}.topbar-right #fps-display,.top-separator{display:none}.viewport{min-height:300px}.track-title{left:16px;top:16px}.track-title strong{font-size:34px}.track-title .eyebrow{font-size:8px}.session-pill{right:10px;top:14px;padding:7px;font-size:8px}.camera-control{bottom:18px;left:12px;gap:7px}.camera-control .eyebrow{display:none}.scene-footnote{font-size:7px;right:8px;bottom:5px}.race-bar{padding:10px;min-height:74px}.primary-button{padding:13px 10px;font-size:10px}.speed-buttons button{padding:9px 6px}.race-timer{bottom:82px;right:10px}.results-panel{order:3;display:block;min-height:0;padding:0 20px 12px}.results-top{padding:22px 0 12px}.leaderboard{margin-bottom:16px}.telemetry{margin-bottom:15px}.right-footer{margin:8px 0 16px}}
 @media(prefers-reduced-motion:reduce){.blink-caret{animation:none}*{scroll-behavior:auto!important}}
+
+
+/* v0.2: drivetrain lab and dynamic telemetry */
+.tune-group{margin:25px 0 16px;padding:9px 0;border-bottom:1px solid #405061;
+ color:var(--yellow);font:600 10px 'DM Mono',monospace;letter-spacing:1.25px}
+.tune-group:first-child{margin-top:2px}
+.drive-picker{background:#202c37;border:1px solid #3a4855;border-radius:6px;
+ padding:12px;margin-bottom:23px}
+.drive-picker label{display:block;font-size:12px;font-weight:700;margin-bottom:8px}
+.drive-picker select{display:block;width:100%;background:#111b25;border:1px solid #667482;
+ border-radius:4px;color:#f5c95a;padding:10px 9px;font:600 12px 'DM Sans',sans-serif;cursor:pointer}
+.drive-picker p{font-size:10px;line-height:1.55;color:#94a5b3;margin:10px 0 1px}
+.tele-grid{grid-template-columns:1fr 1fr;row-gap:15px}
+.tele-grid strong#tele-drive{font:600 11px 'DM Sans',sans-serif;line-height:1.2}
+.tele-warnings{color:#d7bb82;border-bottom:1px solid #354150;padding:0 0 13px;margin-top:-3px;
+ margin-bottom:12px;font:10px/1.65 'DM Mono',monospace}
+.results-panel .tele-note{min-height:50px}
+@media(max-width:690px){.drive-picker{margin-bottom:18px}.tune-group{margin-top:22px}}
