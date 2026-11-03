@@ -6,7 +6,7 @@
   <meta name="theme-color" content="#0d1119">
   <meta name="description" content="TinyTorque, le laboratoire de voitures RC. Traction, propulsion, pneus et dérapages : réglez vos bolides et observez les pilotes IA.">
   <title>TinyTorque — Build. Tune. Race. Repeat.</title>
-  <link rel="stylesheet" href="./assets/style.css?v=0.4">
+  <link rel="stylesheet" href="./assets/style.css?v=0.4.1">
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='16' fill='%230d1119'/%3E%3Cpath d='M8 42l8-19h32l8 19H8z' fill='%23f7c75b'/%3E%3Ccircle cx='18' cy='44' r='7' fill='%23fff'/%3E%3Ccircle cx='46' cy='44' r='7' fill='%23fff'/%3E%3C/svg%3E">
 </head>
 <body>
@@ -35,7 +35,7 @@
         <button id="import" type="button">Importer un profil ↙</button>
         <input id="file-input" type="file" accept=".json,application/json" hidden>
       </div>
-      <footer class="side-footer"><span>TOUT EST SAUVEGARDÉ LOCALEMENT</span><span>V0.4</span></footer>
+      <footer class="side-footer"><span>TOUT EST SAUVEGARDÉ LOCALEMENT</span><span>V0.4.1</span></footer>
     </aside>
     <main class="main">
       <header class="topbar">
@@ -68,9 +68,8 @@
       </section>
     </main>
     <aside class="results-panel">
-      <div class="results-top"><span class="eyebrow">04 / LA COMPÉTITION</span><h2>Classement<span class="blink-caret">_</span></h2><p>Le meilleur réglage gagne. Pas le plus joli.</p></div>
       <section class="record-panel" aria-labelledby="record-title">
-        <div class="record-top"><span class="eyebrow">05 / CHRONO À BATTRE</span><span class="record-local">● SUR CET APPAREIL</span></div>
+        <div class="record-top"><span class="eyebrow">04 / RECORD DU TOUR</span><span class="record-local">● LOCAL</span></div>
         <h3 id="record-title">Record du tour</h3>
         <div class="record-main"><strong id="record-time" aria-live="polite">--:--.--</strong><span id="record-crown">★</span></div>
         <p id="record-holder" class="record-holder">Aucun tour chronométré</p>
@@ -89,6 +88,7 @@
         <button class="share-record" type="button" id="share-record" disabled><span>↗</span> Copier mon défi pour X</button>
         <p id="record-storage" class="record-storage">Records et réglages privés, conservés uniquement dans ce navigateur. Aucun classement mondial pour l'instant.</p>
       </section>
+      <div class="results-top"><span class="eyebrow">05 / LA COMPÉTITION</span><h2>Classement<span class="blink-caret">_</span></h2><p>Le meilleur réglage gagne. Pas le plus joli.</p></div>
       <div class="leaderboard-top"><span>POS / VOITURE</span><span>TOUR / VITESSE</span></div>
       <div id="leaderboard" class="leaderboard" aria-live="polite"></div>
       <div class="telemetry"><div class="telemetry-heading"><span class="eyebrow">TÉLÉMÉTRIE</span><span class="signal">◉ LIVE</span></div><div class="telemetry-speed"><strong id="tele-speed">0</strong><span>km/h<br><small>SIMULÉS</small></span></div><div class="meter-track"><div id="speed-meter"></div></div><div class="tele-grid"><div><span>TOURS</span><strong id="tele-lap">0 / 3</strong></div><div><span>HORS PISTE</span><strong id="tele-offset">0.0 m</strong></div><div><span>GLISSEMENT</span><strong id="tele-slip">0°</strong></div><div><span>TRANSMISSION</span><strong id="tele-drive">4 roues motrices</strong></div></div><div class="tele-warnings" id="tele-warnings">0 glissades · 0 tonneau · 0 remise en piste</div><div class="tele-note" id="tele-note">Sélectionnez un véhicule dans le garage.</div></div>
@@ -98,6 +98,6 @@
   </div>
   <div id="toast" class="toast" role="status" aria-live="polite"></div>
   <noscript>Activez JavaScript pour utiliser le simulateur TinyTorque.</noscript>
-  <script type="module" src="./assets/app.js?v=0.4"></script>
+  <script type="module" src="./assets/app.js?v=0.4.1"></script>
 </body>
 </html>
