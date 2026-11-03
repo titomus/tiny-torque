@@ -78,3 +78,20 @@ test('dynamic integration stays finite through abusive driver inputs',()=>{
     }
   }
 });
+
+test('maxing every slider does not erase chassis differences',()=>{
+  const chassisSet=[
+    {massFactor:.96,wheelbase:3.15,frontWeight:.54,speedFactor:1,nativeGrip:1,yawInertia:1,trackWidth:2.65,rollResist:1.05},
+    {massFactor:1.04,wheelbase:3.5,frontWeight:.48,speedFactor:1.1,nativeGrip:.94,yawInertia:1.14,trackWidth:2.50,rollResist:.96},
+    {massFactor:.89,wheelbase:2.85,frontWeight:.61,speedFactor:.94,nativeGrip:1.12,yawInertia:.78,trackWidth:2.95,rollResist:1.14},
+    {massFactor:1.13,wheelbase:3.05,frontWeight:.44,speedFactor:1.04,nativeGrip:1.02,yawInertia:.90,trackWidth:2.70,rollResist:.90}
+  ];
+  const allMax={drivetrain:'awd'};
+  for (const tuner of TUNE_FIELDS) allMax[tuner.key]=tuner.max;
+  const distances=chassisSet.map(chassis=>{
+    const state=createVehicleState();
+    for(let i=0;i<360;i++)tuneVehicle(state,allMax,chassis,{steer:0,throttle:1,brake:0},0,1/60);
+    return Number(state.z.toFixed(2));
+  });
+  assert.ok(new Set(distances).size===4,'Four distinct chassis must remain physically distinct');
+});
