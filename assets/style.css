@@ -25,3 +25,48 @@
  margin-bottom:12px;font:10px/1.65 'DM Mono',monospace}
 .results-panel .tele-note{min-height:50px}
 @media(max-width:690px){.drive-picker{margin-bottom:18px}.tune-group{margin-top:22px}}
+
+
+/* V0.4: personal lap-record challenge */
+.record-panel{
+  position:relative;overflow:hidden;border:1px solid #5c563f;border-radius:8px;
+  background:linear-gradient(142deg,#333122 0%,#242923 49%,#1a242a 100%);
+  padding:17px 15px 15px;margin:0 0 21px;box-shadow:0 10px 27px #080f1945;
+}
+.record-panel:before{content:'';position:absolute;width:140px;height:140px;
+ border:1px solid #f6c95b12;border-radius:50%;right:-86px;top:-52px;
+ box-shadow:0 0 0 30px #f6c95b08,0 0 0 60px #f6c95b04;pointer-events:none}
+.record-top{display:flex;align-items:center;gap:5px;justify-content:space-between}
+.record-top .eyebrow{color:#d1bc86;font-size:9px}
+.record-local{font:8px 'DM Mono',monospace;color:#b9c9be;white-space:nowrap}
+.record-panel h3{font:800 23px 'Barlow Condensed',sans-serif;letter-spacing:.25px;
+ margin:11px 0 1px}
+.record-main{display:flex;align-items:center;gap:8px}
+.record-main strong{font:700 clamp(31px,3vw,39px) 'DM Mono',monospace;
+ letter-spacing:-1.8px;color:var(--yellow);font-variant-numeric:tabular-nums}
+.record-main span{font-size:21px;color:var(--yellow);align-self:center}
+.record-holder{font-size:12px;font-weight:800;margin:7px 0 2px;color:#f1f2e5}
+.record-context{font-size:10px;color:#a6b3ab;line-height:1.5;margin:0}
+.record-divider{height:1px;background:#a08b5f50;margin:14px 0}
+.record-meta{display:flex;align-items:center;justify-content:space-between;gap:5px;margin:10px 0}
+.record-meta span{font:8px 'DM Mono',monospace;letter-spacing:.3px;color:#9ca6a9}
+.record-meta strong{font:600 12px 'DM Mono',monospace;color:#d7e1dd}
+.record-cars{margin:15px 0;border-top:1px solid #68716250;border-bottom:1px solid #68716250;padding:5px 0}
+.record-car{display:grid;grid-template-columns:10px minmax(0,1fr) auto;
+ align-items:center;gap:7px;padding:6px 0;font-size:10px}
+.record-car i{width:9px;height:9px;border-radius:2px}
+.record-car span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#c0cbcc}
+.record-car strong{font:600 10px 'DM Mono',monospace;color:#e6e9e4}
+.record-label{display:block;color:#abb8b6;font:9px 'DM Mono',monospace;
+ letter-spacing:.7px;margin:14px 0 6px}
+#driver-name{display:block;width:100%;min-width:0;background:#141d25;border:1px solid #526357;
+ border-radius:4px;color:#f3f5eb;padding:10px 11px;font-size:12px}
+#driver-name::placeholder{color:#808b87}
+.share-record{display:flex;align-items:center;justify-content:center;gap:8px;
+ width:100%;background:var(--yellow);color:#10171a;border:0;border-radius:4px;
+ padding:11px 8px;font-size:12px;font-weight:800;margin-top:10px}
+.share-record:hover:not(:disabled){background:#ffdc7d}
+.share-record:disabled{opacity:.45}
+.record-storage{color:#929f9d;font-size:9px;line-height:1.55;margin:11px 0 0}
+@media(max-width:1020px){.record-panel{grid-column:1/-1;margin-top:6px}}
+@media(max-width:690px){.record-panel{margin-bottom:16px}.record-main strong{font-size:39px}}
