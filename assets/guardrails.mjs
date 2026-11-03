@@ -51,48 +51,47 @@ export function projectToSegment(x,z,segment) {
 export function collideWithGuardrails(state, rails, progressIndex, dt, options = {}) {
   const radius=options.radius??DEFAULT_CAR_RADIUS;
   const restitution=options.restitution??0.17;
-  const friction=options.friction??0.21;
-  const window=Math.min(rails.count>>1,options.window??21);
+  const friction=options.friction??0.12;
+  const window=Math.min(Math.floor(rails.count/3), options.window??15);
   const count=rails.count;
-  const oldX=options.oldX??state.x-state.vx*dt;
-  const oldZ=options.oldZ??state.z-state.vz*dt;
   let impacts=0,maxImpact=0;
-  // Up to three resolution passes handle inside corners and simultaneous contacts.
-  for(let attempt=0;attempt<3;attempt++) {
-    let collision=null,priority=Infinity;
+  // Project to the closest local rail segment, not a different branch of a hairpin.
+  // A single physical impulse is applied each frame; additional passes correct
+  // the position along neighboring segments without repeatedly killing speed.
+  let impulseUsed=false;
+  for(let attempt=0;attempt<5;attempt++) {
+    let contact=null,dist2=Infinity;
     for(const side of rails.sides) {
+      let nearest=null,nearDistance=Infinity;
       for(let d=-window;d<=window;d++) {
         const seg=side.segments[(progressIndex+d+count)%count];
         const proj=projectToSegment(state.x,state.z,seg);
-        // A line-strip collision uses the wall's inward-facing normal.
-        // Endpoint contacts are considered near the segment but not across a distant branch.
-        const reach=(proj.t===0||proj.t===1)?radius+0.65:radius+0.08;
-        if(proj.dist2>(reach+Math.max(0,proj.signed))**2 &&
-            proj.signed < -radius)continue;
-        if(proj.signed<=-radius)continue;
-        // Only accept the corridor side for this segment. In severe overlap
-        // select the strongest penetration, otherwise the nearest segment.
-        const penalty=(proj.signed+radius);
-        const score=proj.dist2 - Math.min(penalty,8)*1.2;
-        if(score<priority) {priority=score;collision={seg,proj};}
+        if(proj.dist2<nearDistance) {
+          nearDistance=proj.dist2;
+          nearest={seg,proj};
+        }
+      }
+      if(nearest && nearest.proj.signed > -radius && nearDistance < dist2) {
+        contact=nearest;
+        dist2=nearDistance;
       }
     }
-    if(!collision)break;
-    const {seg,proj}=collision;
-    // Project toward the inside of the race course.
-    const push=Math.min(80,proj.signed+radius+.018);
-    state.x-=seg.outX*push;
-    state.z-=seg.outZ*push;
-    const outwardSpeed=state.vx*seg.outX+state.vz*seg.outZ;
-    if(outwardSpeed>0) {
+    if(!contact)break;
+    const {seg,proj}=contact;
+    const correction=Math.min(50,proj.signed+radius+.025);
+    if(correction<=0)break;
+    state.x-=seg.outX*correction;
+    state.z-=seg.outZ*correction;
+    const outward=state.vx*seg.outX+state.vz*seg.outZ;
+    if(outward>0 && !impulseUsed) {
       const tx=-seg.outZ,tz=seg.outX;
-      const tangentSpeed=state.vx*tx+state.vz*tz;
-      const impact=Math.abs(outwardSpeed);
-      maxImpact=Math.max(maxImpact,impact);
-      state.vx=tx*tangentSpeed*(1-friction)-seg.outX*outwardSpeed*restitution;
-      state.vz=tz*tangentSpeed*(1-friction)-seg.outZ*outwardSpeed*restitution;
-      state.yawRate=(state.yawRate||0)*.75+Math.max(-.75,Math.min(.75,tangentSpeed*.009))*seg.outX;
-      impacts++;
+      const tangential=state.vx*tx+state.vz*tz;
+      maxImpact=outward;
+      state.vx=tx*tangential*(1-friction)-seg.outX*outward*restitution;
+      state.vz=tz*tangential*(1-friction)-seg.outZ*outward*restitution;
+      state.yawRate=(state.yawRate||0)*.80+Math.max(-.7,Math.min(.7,tangential*.007))*seg.outX;
+      impacts=1;
+      impulseUsed=true;
     }
   }
   state.speed=Math.hypot(state.vx,state.vz);
