@@ -80,3 +80,59 @@
 .incoming-challenge strong{font:700 22px 'DM Mono',monospace;color:#a4ffd3}
 .incoming-challenge span:not(.eyebrow){font-size:11px;font-weight:700;color:#f0f9f4}
 .incoming-challenge small{display:block;color:#9abcb0;font-size:9px;line-height:1.5;margin-top:8px}
+
+
+/* V0.4.1: fix a collapsed leaderboard card in the desktop flex sidebar.
+   Height was taken from the record because .record-panel was a shrinking
+   flex child with overflow:hidden. Make the sidebar scroll instead. */
+.results-panel{
+  min-height:0;
+  overscroll-behavior:contain;
+  scrollbar-width:thin;
+  scrollbar-color:#53616c #121923;
+}
+.results-panel > .record-panel,
+.results-panel > .results-top,
+.results-panel > .leaderboard-top,
+.results-panel > .leaderboard,
+.results-panel > .telemetry,
+.results-panel > .lab-note,
+.results-panel > .right-footer{flex-shrink:0}
+.results-panel > .record-panel{
+  flex:0 0 auto;
+  min-height:max-content;
+  overflow:hidden;
+  margin:20px 0 0;
+  padding:18px 15px;
+}
+.results-panel > .results-top{padding:22px 4px 15px}
+.record-top{flex-wrap:wrap;column-gap:6px;row-gap:7px}
+.record-top .eyebrow{font-size:9px;letter-spacing:.55px}
+.record-local{
+  border:1px solid #91ab9260;border-radius:30px;
+  padding:3px 6px;font-size:8px;
+}
+.record-panel h3{font-size:27px;line-height:1.05;margin-top:13px}
+.record-main{margin-top:7px}
+.record-main strong{font-size:clamp(29px,2.5vw,37px);letter-spacing:-1.8px;white-space:nowrap}
+.record-holder{margin-top:9px}
+.record-cars{margin-top:12px;margin-bottom:12px}
+.record-storage{margin-bottom:0}
+@media(max-width:1350px){
+  .app{grid-template-columns:298px minmax(360px,1fr) 300px}
+}
+@media(min-width:1351px){
+  .app{grid-template-columns:338px minmax(390px,1fr) 326px}
+}
+@media(max-width:1020px){
+  .results-panel > .record-panel{
+    grid-column:1/-1;grid-row:auto;margin:18px 0 0;
+  }
+  .results-panel > .results-top{grid-column:1/-1;grid-row:auto}
+  .results-panel{grid-auto-flow:row;align-content:start}
+}
+@media(max-width:690px){
+  .results-panel > .record-panel{margin:16px 0 0}
+  .results-panel > .results-top{padding:24px 2px 14px}
+  .record-main strong{font-size:38px}
+}
