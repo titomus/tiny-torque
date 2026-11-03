@@ -4,7 +4,7 @@
 
 Un jeu original de voitures radiocommandées conçu autour d'une idée : **vous réglez les véhicules, les pilotes automatiques les mettent à l'épreuve**.
 
-## Prototype v0.2
+## Prototype v0.3
 
 - Circuit et voitures en **3D** avec Three.js
 - **4 voitures** dont les paramètres sont modifiables séparément
@@ -26,6 +26,16 @@ Les modifications changent réellement le comportement des voitures. Contraireme
 Le moteur reste une **approximation arcade du modèle dynamique à deux essieux**, pas une simulation à quatre pneus avec collisions solides, ressorts 3D, usure, boîte multirapport ni reproduction exacte de Re-Volt. Les tours sont validés par passages aux checkpoints, et les essais restent déterministes sauf pour les effets cosmétiques. Les résultats peuvent varier si l'on modifie les réglages pendant une course.
 
 **Validation :** les tests Node vérifient les différences de transmission, la perte de motricité hors piste, l'effet de la transmission et la stabilité numérique. Ils s'exécutent avant chaque publication GitHub Pages.
+
+### Protections de piste (v0.3)
+
+- Deux glissières métalliques continues avec bandes rouges/blanches, de part et d'autre de la piste.
+- Bas-côté en herbe entre l'asphalte et les barrières : on peut déraper hors piste, mais plus traverser les jardins pour couper.
+- Chocs latéraux : recul sur l'axe normal, ralentissement tangentiel et petite impulsion de rotation.
+- Rembourrage de collision du véhicule, vérification complémentaire après les chocs entre voitures, impacts dénombrés en télémétrie.
+- Tests géométriques contre les traversées à grande vitesse, les chocs directs et les contacts répétés.
+
+La collision contre les rails est simulée en 2D. Les protections ne sont pas des objets rigides 3D destructibles.
 
 ## Jouer
 
