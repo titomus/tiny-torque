@@ -3,9 +3,9 @@ import { DRIVE_MODES, TUNE_FIELDS, createVehicleState, tuneVehicle } from './phy
 import { createGuardrailTrack, collideWithGuardrails, smoothClosedTrack, WALL_HEIGHT } from './guardrails.mjs';
 import { TRACK_CONTROL_POINTS } from './track.mjs';
 import {
-  RECORDS_KEY, DRIVER_KEY, newRecordBook, restoreRecordBook,
-  formatLap, sanitizeDriver, submitLap, fastestRecord, lapCrossing,
-  buildChallengeLink, readChallenge
+  RECORDS_KEY, DRIVER_KEY, X_HANDLE_KEY, newRecordBook, restoreRecordBook,
+  formatLap, sanitizeDriver, sanitizeXHandle, submitLap, fastestRecord, lapCrossing,
+  buildChallengeLink, readChallenge, makeShareText
 } from './records.mjs';
 
 const $ = (id) => document.getElementById(id);
@@ -61,9 +61,11 @@ const cars = CAR_PRESETS.map((preset, index) => ({
 }));
 let recordBook=newRecordBook();
 let driverName='Anonyme';
+let xHandle='';
 try {
   recordBook=restoreRecordBook(JSON.parse(localStorage.getItem(RECORDS_KEY) || 'null'));
   driverName=sanitizeDriver(localStorage.getItem(DRIVER_KEY));
+  xHandle=sanitizeXHandle(localStorage.getItem(X_HANDLE_KEY));
 } catch (_) {recordBook=newRecordBook();}
 function saveRecords() {
   try {localStorage.setItem(RECORDS_KEY,JSON.stringify(recordBook));}
@@ -456,7 +458,7 @@ function checkGates(car,previous,index) {
         car.bestLap=car.bestLap===null?crossing.seconds:Math.min(car.bestLap,crossing.seconds);
         const verdict=submitLap(recordBook,{
           carId:car.id,time:crossing.seconds,driver:driverName,
-          at:new Date().toISOString(),tune:car.tune
+          at:new Date().toISOString(),tune:car.tune,xHandle
         });
         if(verdict.accepted)saveRecords();
         if(verdict.overallBest)toast('NOUVEAU RECORD ! '+car.name+' · '+formatLap(crossing.seconds));
@@ -689,7 +691,8 @@ function showIncomingChallenge() {
   if(!incomingChallenge)return;
   $('incoming-challenge').hidden=false;
   $('incoming-time').textContent=formatLap(incomingChallenge.time);
-  $('incoming-from').textContent=incomingChallenge.driver+' · '+
+  $('incoming-from').textContent=incomingChallenge.driver+
+    (incomingChallenge.xHandle?' · @'+incomingChallenge.xHandle:'')+' · '+
     CAR_PRESETS[incomingChallenge.carId].name+' · À battre !';
 }
 function renderRecordBoard() {
@@ -697,8 +700,9 @@ function renderRecordBoard() {
   const sessionBest=cars.reduce((acc,car)=>
     car.bestLap!==null && (acc===null||car.bestLap<acc)?car.bestLap:acc,null);
   $('record-time').textContent=best?formatLap(best.time):'--:--.--';
+  const displayedHandle=best && (best.driver===driverName ? xHandle : best.xHandle);
   $('record-holder').textContent=best ?
-    best.driver+' · '+CAR_PRESETS[best.carId].name : 'Aucun tour chronométré';
+    best.driver+(displayedHandle?' · @'+displayedHandle:'')+' · '+CAR_PRESETS[best.carId].name : 'Aucun tour chronométré';
   $('record-context').textContent=best ?
     'La référence à battre sur ce navigateur. Configurez une voiture et faites mieux !' :
     'Le premier franchissement lance le chrono ; les tours suivants comptent.';
@@ -775,15 +779,35 @@ $('driver-name').addEventListener('change',e=>{
   try {localStorage.setItem(DRIVER_KEY,driverName);} catch (_) {/* private mode */}
   toast('Pseudo enregistré sur cet appareil.');
 });
+$('x-handle').value=xHandle?'@'+xHandle:'';
+$('x-handle').addEventListener('change',e=>{
+  const raw=e.target.value.trim();
+  const normalized=sanitizeXHandle(raw);
+  if(raw&&!normalized){
+    e.target.value=xHandle?'@'+xHandle:'';
+    toast('Identifiant X invalide : 1 à 15 lettres, chiffres ou underscores.');
+    return;
+  }
+  xHandle=normalized;
+  e.target.value=xHandle?'@'+xHandle:'';
+  try {localStorage.setItem(X_HANDLE_KEY,xHandle);} catch (_) {/* private mode */}
+  renderRecordBoard();
+  toast(xHandle?'Compte X enregistré sur cet appareil.':'Mention X désactivée.');
+});
 $('share-record').addEventListener('click',async()=>{
   const best=fastestRecord(recordBook);
   if(!best)return;
   const drive=best.tune?.drivetrain==='fwd'?'traction AV':
     best.tune?.drivetrain==='awd'?'4×4':'propulsion AR';
-  const link=buildChallengeLink(best,window.location.href);
-  const shareText='Mon record TinyTorque : '+formatLap(best.time)+' avec '+
-    CAR_PRESETS[best.carId].name+' ('+drive+'). Et toi, tu fais mieux ?\n'+link+
-    '\n#TinyTorque #RCCars';
+  // Never guess that the garage nickname belongs to an identically named X account.
+  // Existing records can use the newly provided handle if the local nickname matches.
+  const effectiveHandle=best.driver===driverName?xHandle:(best.xHandle||'');
+  const shareEntry={...best,xHandle:effectiveHandle};
+  const link=buildChallengeLink(shareEntry,window.location.href);
+  const shareText=makeShareText({
+    entry:shareEntry,carName:CAR_PRESETS[best.carId].name,
+    driveName:drive,url:link,xHandle:effectiveHandle
+  });
   try {
     if(!navigator.clipboard?.writeText)throw new Error('Clipboard unavailable');
     await navigator.clipboard.writeText(shareText);
