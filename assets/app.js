@@ -29,7 +29,7 @@ const CAR_PRESETS = [
     tune:{power:95,topSpeed:28,gearing:1.2,diffLock:.4,grip:1.38,pressure:.95,mass:82,cg:.35,suspension:1.2,steering:1.25,brakeBias:.65,aero:1.2,aggression:.85,drivetrain:'fwd'}
   },{
     name:'Nightshift', code:'04 / SAUVAGE', color:'#a493f4',
-    chassis:{massFactor:1.13,wheelbase:3,wheelbase:3.05,frontWeight:.44,speedFactor:1.04,nativeGrip:1.02,yawInertia:.9,trackWidth:2.7,rollResist:.90},
+    chassis:{massFactor:1.13,wheelbase:3.05,frontWeight:.44,speedFactor:1.04,nativeGrip:1.02,yawInertia:.9,trackWidth:2.7,rollResist:.90},
     tune:{power:125,topSpeed:35,gearing:1.1,diffLock:.9,grip:1,pressure:.9,mass:125,cg:.7,suspension:1.3,steering:1.1,brakeBias:.47,aero:.9,aggression:1.13,drivetrain:'rwd'}
   }
 ];
