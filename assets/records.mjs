@@ -71,6 +71,25 @@ export function submitLap(book, {carId,time,driver,at,tune}) {
   }
   return {accepted:true,personalBest,overallBest};
 }
+export function buildChallengeLink(entry, currentUrl) {
+  if(!entry || !validLapSeconds(entry.time) || !Number.isInteger(entry.carId))return currentUrl;
+  const url=new URL(currentUrl);
+  url.search='';
+  url.hash='';
+  url.searchParams.set('tt_time',entry.time.toFixed(3));
+  url.searchParams.set('tt_car',String(entry.carId));
+  url.searchParams.set('tt_by',sanitizeDriver(entry.driver));
+  return url.toString();
+}
+export function readChallenge(search) {
+  const params=new URLSearchParams(search);
+  if(!params.has('tt_time')||!params.has('tt_car'))return null;
+  const time=Number(params.get('tt_time'));
+  const carId=Number(params.get('tt_car'));
+  if(!validLapSeconds(time)||!Number.isInteger(carId)||carId<0||carId>3)return null;
+  return {time,carId,driver:sanitizeDriver(params.get('tt_by'))};
+}
+
 export function lapCrossing(car, elapsed) {
   // First pass of the finish line establishes the starting reference.
   // Starting grid cars sit past the line, so their opening partial lap
