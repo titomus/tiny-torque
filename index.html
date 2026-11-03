@@ -6,7 +6,7 @@
   <meta name="theme-color" content="#0d1119">
   <meta name="description" content="TinyTorque, le laboratoire de voitures RC. Traction, propulsion, pneus et dérapages : réglez vos bolides et observez les pilotes IA.">
   <title>TinyTorque — Build. Tune. Race. Repeat.</title>
-  <link rel="stylesheet" href="./assets/style.css?v=0.2">
+  <link rel="stylesheet" href="./assets/style.css?v=0.3">
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='16' fill='%230d1119'/%3E%3Cpath d='M8 42l8-19h32l8 19H8z' fill='%23f7c75b'/%3E%3Ccircle cx='18' cy='44' r='7' fill='%23fff'/%3E%3Ccircle cx='46' cy='44' r='7' fill='%23fff'/%3E%3C/svg%3E">
 </head>
 <body>
@@ -35,7 +35,7 @@
         <button id="import" type="button">Importer un profil ↙</button>
         <input id="file-input" type="file" accept=".json,application/json" hidden>
       </div>
-      <footer class="side-footer"><span>TOUT EST SAUVEGARDÉ LOCALEMENT</span><span>V0.2</span></footer>
+      <footer class="side-footer"><span>TOUT EST SAUVEGARDÉ LOCALEMENT</span><span>V0.3</span></footer>
     </aside>
     <main class="main">
       <header class="topbar">
@@ -55,7 +55,7 @@
             <button data-camera="top" type="button">DESSUS</button>
           </div>
         </div>
-        <div class="scene-footnote">DYNAMIQUE DES PNEUS · PERTE D’ADHÉRENCE · PILOTES IA</div>
+        <div class="scene-footnote">BARRIÈRES PHYSIQUES · DÉRAPAGES · PILOTES IA</div>
       </div>
       <section class="race-bar" aria-label="Contrôles de course">
         <div class="race-title"><span class="eyebrow">03 / SIMULATION</span><h2>Le banc d'essai</h2><p>Vous réglez. Ils pilotent.</p></div>
@@ -72,12 +72,12 @@
       <div class="leaderboard-top"><span>POS / VOITURE</span><span>TOUR / VITESSE</span></div>
       <div id="leaderboard" class="leaderboard" aria-live="polite"></div>
       <div class="telemetry"><div class="telemetry-heading"><span class="eyebrow">TÉLÉMÉTRIE</span><span class="signal">◉ LIVE</span></div><div class="telemetry-speed"><strong id="tele-speed">0</strong><span>km/h<br><small>SIMULÉS</small></span></div><div class="meter-track"><div id="speed-meter"></div></div><div class="tele-grid"><div><span>TOURS</span><strong id="tele-lap">0 / 3</strong></div><div><span>HORS PISTE</span><strong id="tele-offset">0.0 m</strong></div><div><span>GLISSEMENT</span><strong id="tele-slip">0°</strong></div><div><span>TRANSMISSION</span><strong id="tele-drive">4 roues motrices</strong></div></div><div class="tele-warnings" id="tele-warnings">0 glissades · 0 tonneau · 0 remise en piste</div><div class="tele-note" id="tele-note">Sélectionnez un véhicule dans le garage.</div></div>
-      <div class="lab-note"><div class="note-icon">✳</div><strong>LE PRINCIPE</strong><p>Une propulsion puissante peut patiner. Une traction peut tirer tout droit. Une voiture trop haute peut se retourner. Cherchez l’équilibre, pas tous les curseurs à fond.</p></div>
+      <div class="lab-note"><div class="note-icon">✳</div><strong>LE PRINCIPE</strong><p>Les protections en bord de piste ralentissent les voitures qui s'y écrasent. Une configuration instable peut déraper, heurter un rail ou rester coincée sur l'herbe.</p></div>
       <div class="right-footer">BUILT FOR TINKERERS, NOT DRIVERS.</div>
     </aside>
   </div>
   <div id="toast" class="toast" role="status" aria-live="polite"></div>
   <noscript>Activez JavaScript pour utiliser le simulateur TinyTorque.</noscript>
-  <script type="module" src="./assets/app.js?v=0.2"></script>
+  <script type="module" src="./assets/app.js?v=0.3"></script>
 </body>
 </html>
