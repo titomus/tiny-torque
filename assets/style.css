@@ -70,3 +70,13 @@
 .record-storage{color:#929f9d;font-size:9px;line-height:1.55;margin:11px 0 0}
 @media(max-width:1020px){.record-panel{grid-column:1/-1;margin-top:6px}}
 @media(max-width:690px){.record-panel{margin-bottom:16px}.record-main strong{font-size:39px}}
+
+
+.incoming-challenge[hidden]{display:none}
+.incoming-challenge{margin-top:12px;padding:11px;border:1px solid #77d7a959;
+ border-radius:5px;background:#112f29a6}
+.incoming-challenge .eyebrow{color:#7de8b5;font-size:9px}
+.incoming-challenge>div{display:flex;flex-direction:column;gap:5px;margin-top:7px}
+.incoming-challenge strong{font:700 22px 'DM Mono',monospace;color:#a4ffd3}
+.incoming-challenge span:not(.eyebrow){font-size:11px;font-weight:700;color:#f0f9f4}
+.incoming-challenge small{display:block;color:#9abcb0;font-size:9px;line-height:1.5;margin-top:8px}
