@@ -2,6 +2,10 @@ import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.180.0/build/three.m
 import { DRIVE_MODES, TUNE_FIELDS, createVehicleState, tuneVehicle } from './physics.mjs';
 import { createGuardrailTrack, collideWithGuardrails, smoothClosedTrack, WALL_HEIGHT } from './guardrails.mjs';
 import { TRACK_CONTROL_POINTS } from './track.mjs';
+import {
+  RECORDS_KEY, DRIVER_KEY, newRecordBook, restoreRecordBook,
+  formatLap, sanitizeDriver, submitLap, fastestRecord, lapCrossing
+} from './records.mjs';
 
 const $ = (id) => document.getElementById(id);
 const STORAGE_KEY = 'tinytorque-garage-v1'; // Migrates existing settings by individual field.
@@ -51,8 +55,22 @@ const cars = CAR_PRESETS.map((preset, index) => ({
   ...preset, id:index, tune:sanitizeTune(saved && saved[index], preset.tune),
   speed:0, index:0, lap:0, finished:false, finishedAt:0, heading:0,
   position:new THREE.Vector3(), visual:null, wheelParts:[], laneOffset:0, offroad:0,
-  physics:createVehicleState(),sector:0,rescueCount:0,stuckTime:0,slides:0,lastSlide:false,spinTime:0,penalty:0,dnf:false,dustCooldown:0,wallHits:0
+  physics:createVehicleState(),sector:0,rescueCount:0,stuckTime:0,slides:0,lastSlide:false,spinTime:0,penalty:0,dnf:false,dustCooldown:0,wallHits:0,
+  lapStartAt:null,lapInvalid:false,lastLap:null,bestLap:null
 }));
+let recordBook=newRecordBook();
+let driverName='Anonyme';
+try {
+  recordBook=restoreRecordBook(JSON.parse(localStorage.getItem(RECORDS_KEY) || 'null'));
+  driverName=sanitizeDriver(localStorage.getItem(DRIVER_KEY));
+} catch (_) {recordBook=newRecordBook();}
+function saveRecords() {
+  try {localStorage.setItem(RECORDS_KEY,JSON.stringify(recordBook));}
+  catch(_){toast('Le navigateur bloque la sauvegarde des records.');}
+}
+function markChangedTune(car) {
+  if(mode==='running'||mode==='paused')car.lapInvalid=true;
+}
 function saveGarage() {
   try { localStorage.setItem(STORAGE_KEY, JSON.stringify(cars.map(car => car.tune))); } catch (_) { /* storage may be disabled */ }
 }
@@ -374,6 +392,10 @@ function resetRace() {
     car.dnf=false;
     car.dustCooldown=0;
     car.wallHits=0;
+    car.lapStartAt=null;
+    car.lapInvalid=false;
+    car.lastLap=null;
+    car.bestLap=null;
     car.laneOffset=i%2?1.75:-1.75;
     const p=pointWithOffset(car.index,car.laneOffset);
     const t=tangents[car.index];
@@ -408,6 +430,7 @@ function rescueCar(car,index) {
   car.offroad=0;
   car.stuckTime=0;
   car.rescueCount++;
+  car.lapInvalid=true;
   car.penalty+=6;
   toast(car.name+' remise sur la piste (+6 s de pénalité).');
 }
@@ -424,6 +447,21 @@ function checkGates(car,previous,index) {
     const g=gates[car.sector];
     if(previous<g && index>=g && index-previous<12)car.sector++;
   } else if(previous>POINT_COUNT-12 && index<12) {
+    const crossing=lapCrossing(car,elapsed);
+    if(crossing.complete) {
+      car.lastLap=crossing.seconds;
+      if(crossing.valid) {
+        car.bestLap=car.bestLap===null?crossing.seconds:Math.min(car.bestLap,crossing.seconds);
+        const verdict=submitLap(recordBook,{
+          carId:car.id,time:crossing.seconds,driver:driverName,
+          at:new Date().toISOString(),tune:car.tune
+        });
+        if(verdict.accepted)saveRecords();
+        if(verdict.overallBest)toast('NOUVEAU RECORD ! '+car.name+' · '+formatLap(crossing.seconds));
+        else if(verdict.personalBest)toast('Record '+car.name+' : '+formatLap(crossing.seconds));
+        renderRecordBoard();
+      }
+    }
     car.lap++;
     car.sector=0;
     if(car.lap>=LAPS) {
@@ -644,6 +682,26 @@ function updateDashboard() {
     'Les réglages modifient la vitesse, les freinages et les trajectoires.';
   $('timer').textContent = lapTime(elapsed);
 }
+function renderRecordBoard() {
+  const best=fastestRecord(recordBook);
+  const sessionBest=cars.reduce((acc,car)=>
+    car.bestLap!==null && (acc===null||car.bestLap<acc)?car.bestLap:acc,null);
+  $('record-time').textContent=best?formatLap(best.time):'--:--.--';
+  $('record-holder').textContent=best ?
+    best.driver+' · '+CAR_PRESETS[best.carId].name : 'Aucun tour chronométré';
+  $('record-context').textContent=best ?
+    'La référence à battre sur ce navigateur. Configurez une voiture et faites mieux !' :
+    'Le premier franchissement lance le chrono ; les tours suivants comptent.';
+  $('record-session').textContent=sessionBest===null?'--:--.--':formatLap(sessionBest);
+  $('record-count').textContent=String(recordBook.lapsRecorded);
+  $('share-record').disabled=!best;
+  $('record-crown').hidden=!best;
+  $('record-cars').innerHTML=CAR_PRESETS.map((preset,i)=>{
+    const rec=recordBook.bestByCar[i];
+    return '<div class="record-car"><i style="background:'+preset.color+'"></i>'+
+      '<span>'+preset.name+'</span><strong>'+(rec?formatLap(rec.time):'--:--.--')+'</strong></div>';
+  }).join('');
+}
 function toggleRace() {
   if (mode==='finished') resetRace();
   mode = mode==='running' ? 'paused' : 'running';
@@ -660,6 +718,7 @@ $('tuners').addEventListener('input', e => {
   if (!def) return;
   const value = clamp(Number(e.target.value),def.min,def.max);
   cars[selected].tune[key] = value;
+  markChangedTune(cars[selected]);
   e.target.style.setProperty('--fill', (value-def.min)/(def.max-def.min)*100 + '%');
   $('val-'+key).textContent = Number(value.toFixed(2)) + (def.unit ? ' '+def.unit : '');
   saveGarage();
@@ -669,12 +728,14 @@ $('tuners').addEventListener('change',e=>{
   if(e.target.id!=='drive-select')return;
   if(!Object.hasOwn(DRIVE_MODES,e.target.value))return;
   cars[selected].tune.drivetrain=e.target.value;
+  markChangedTune(cars[selected]);
   saveGarage();
   updateDashboard();
   toast('Transmission : '+DRIVE_MODES[e.target.value]);
 });
 $('reset-tune').addEventListener('click', () => {
   cars[selected].tune = { ...CAR_PRESETS[selected].tune };
+  markChangedTune(cars[selected]);
   saveGarage(); renderTuners(); toast('Réglages d’origine restaurés.');
 });
 $('randomize').addEventListener('click', () => {
@@ -684,6 +745,7 @@ $('randomize').addEventListener('click', () => {
     current.tune[tune.key] = Number((tune.min+Math.floor(Math.random()*(slots+1))*tune.step).toFixed(2));
   }
   current.tune.drivetrain=['fwd','rwd','awd'][Math.floor(Math.random()*3)];
+  markChangedTune(current);
   saveGarage(); renderTuners(); updateDashboard(); toast('Configuration expérimentale créée !');
 });
 $('start-button').addEventListener('click',toggleRace);
@@ -696,6 +758,31 @@ document.querySelectorAll('[data-camera]').forEach(button => button.addEventList
   cameraMode = button.dataset.camera;
   document.querySelectorAll('[data-camera]').forEach(el=>el.classList.toggle('active',el===button));
 }));
+$('driver-name').value=driverName==='Anonyme'?'':driverName;
+$('driver-name').addEventListener('change',e=>{
+  driverName=sanitizeDriver(e.target.value);
+  e.target.value=driverName==='Anonyme'?'':driverName;
+  try {localStorage.setItem(DRIVER_KEY,driverName);} catch (_) {/* private mode */}
+  toast('Pseudo enregistré sur cet appareil.');
+});
+$('share-record').addEventListener('click',async()=>{
+  const best=fastestRecord(recordBook);
+  if(!best)return;
+  const drive=best.tune?.drivetrain==='fwd'?'traction AV':
+    best.tune?.drivetrain==='awd'?'4×4':'propulsion AR';
+  const link='https://titomus.github.io/tiny-torque/';
+  const shareText='Mon record TinyTorque : '+formatLap(best.time)+' avec '+
+    CAR_PRESETS[best.carId].name+' ('+drive+'). Et toi, tu fais mieux ?\n'+link+
+    '\n#TinyTorque #RCCars';
+  try {
+    if(!navigator.clipboard?.writeText)throw new Error('Clipboard unavailable');
+    await navigator.clipboard.writeText(shareText);
+    toast('Défi copié ! Collez-le sur X pour lancer le challenge.');
+  } catch (_) {
+    window.prompt('Copiez votre défi pour X :',shareText);
+  }
+});
+renderRecordBoard();
 $('export').addEventListener('click', () => {
   const payload = {app:'TinyTorque',version:1,cars:cars.map(c => ({name:c.name,tune:c.tune}))};
   const blob = new Blob([JSON.stringify(payload,null,2)], {type:'application/json'});
@@ -714,7 +801,7 @@ $('file-input').addEventListener('change', async e => {
     if (file.size > 50000) throw new Error('Fichier trop volumineux');
     const payload = JSON.parse(await file.text());
     if (payload.app!=='TinyTorque' || !Array.isArray(payload.cars) || payload.cars.length!==cars.length) throw new Error('Format de garage inconnu');
-    payload.cars.forEach((entry,i) => { cars[i].tune = sanitizeTune(entry.tune,CAR_PRESETS[i].tune); });
+    payload.cars.forEach((entry,i) => { cars[i].tune = sanitizeTune(entry.tune,CAR_PRESETS[i].tune); markChangedTune(cars[i]); });
     saveGarage(); renderTuners(); toast('Quatre voitures importées avec succès.');
   } catch (err) { toast('Import refusé : ' + err.message); }
   e.target.value='';
