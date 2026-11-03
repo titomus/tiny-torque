@@ -1,7 +1,8 @@
 import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.180.0/build/three.module.js';
+import { DRIVE_MODES, TUNE_FIELDS, createVehicleState, tuneVehicle } from './physics.mjs';
 
 const $ = (id) => document.getElementById(id);
-const STORAGE_KEY = 'tinytorque-garage-v1';
+const STORAGE_KEY = 'tinytorque-garage-v1'; // Migrates existing settings by individual field.
 const LAPS = 3;
 const ROAD_WIDTH = 12;
 const POINT_COUNT = 420;
@@ -12,20 +13,26 @@ const angleDiff = (a, b) => Math.atan2(Math.sin(a - b), Math.cos(a - b));
 const fmt = (value) => String(Math.floor(value)).padStart(2, '0');
 const lapTime = (seconds) => fmt(seconds / 60) + ':' + fmt(seconds % 60) + '.' + String(Math.floor(seconds % 1 * 100)).padStart(2, '0');
 
-const TUNERS = [
-  { key:'power', label:'Puissance moteur', min:55, max:180, step:5, unit:'%', desc:'Accélération en sortie de virage' },
-  { key:'topSpeed', label:'Vitesse de pointe', min:16, max:42, step:1, unit:'', desc:'Rapidité sur les longues lignes droites' },
-  { key:'grip', label:'Adhérence', min:0.55, max:1.55, step:0.05, unit:'', desc:'Tenue de route et freinage' },
-  { key:'steering', label:'Direction', min:0.65, max:1.55, step:0.05, unit:'', desc:'Capacité à négocier les virages' },
-  { key:'mass', label:'Masse', min:65, max:155, step:5, unit:'kg', desc:'Inertie et accélération du bolide' }
-];
+const TUNERS = TUNE_FIELDS;
 const CAR_PRESETS = [
-  { name:'Kestrel GT', code:'01 / BALANCED', color:'#ff7458', tune:{power:115,topSpeed:31,grip:1.05,steering:1.05,mass:95} },
-  { name:'Nebula XR', code:'02 / SPEEDSTER', color:'#66e6d6', tune:{power:140,topSpeed:39,grip:0.77,steering:0.85,mass:110} },
-  { name:'Bumble R', code:'03 / GRIP MASTER', color:'#f2d25f', tune:{power:95,topSpeed:28,grip:1.38,steering:1.25,mass:85} },
-  { name:'Nightshift', code:'04 / WILDCARD', color:'#a493f4', tune:{power:125,topSpeed:35,grip:1.0,steering:1.1,mass:130} }
+  {
+    name:'Kestrel GT', code:'01 / ÉQUILIBRÉ', color:'#ff7458',
+    chassis:{massFactor:.96,wheelbase:3.15,frontWeight:.54,speedFactor:1.00,nativeGrip:1.00,yawInertia:1.00,trackWidth:2.65,rollResist:1.05},
+    tune:{power:115,topSpeed:31,gearing:1,diffLock:.55,grip:1.05,pressure:1,mass:95,cg:.48,suspension:.95,steering:1.05,brakeBias:.58,aero:.85,aggression:.95,drivetrain:'awd'}
+  },{
+    name:'Nebula XR', code:'02 / VITESSE', color:'#66e6d6',
+    chassis:{massFactor:1.04,wheelbase:3.5,frontWeight:.48,speedFactor:1.1,nativeGrip:.94,yawInertia:1.14,trackWidth:2.50,rollResist:.96},
+    tune:{power:145,topSpeed:39,gearing:.9,diffLock:.8,grip:.79,pressure:1.1,mass:106,cg:.57,suspension:.7,steering:.90,brakeBias:.55,aero:.7,aggression:1.1,drivetrain:'rwd'}
+  },{
+    name:'Bumble R', code:'03 / ADHÉRENCE', color:'#f2d25f',
+    chassis:{massFactor:.89,wheelbase:2.85,frontWeight:.61,speedFactor:.94,nativeGrip:1.12,yawInertia:.78,trackWidth:2.95,rollResist:1.14},
+    tune:{power:95,topSpeed:28,gearing:1.2,diffLock:.4,grip:1.38,pressure:.95,mass:82,cg:.35,suspension:1.2,steering:1.25,brakeBias:.65,aero:1.2,aggression:.85,drivetrain:'fwd'}
+  },{
+    name:'Nightshift', code:'04 / SAUVAGE', color:'#a493f4',
+    chassis:{massFactor:1.13,wheelbase:3,wheelbase:3.05,frontWeight:.44,speedFactor:1.04,nativeGrip:1.02,yawInertia:.9,trackWidth:2.7,rollResist:.90},
+    tune:{power:125,topSpeed:35,gearing:1.1,diffLock:.9,grip:1,pressure:.9,mass:125,cg:.7,suspension:1.3,steering:1.1,brakeBias:.47,aero:.9,aggression:1.13,drivetrain:'rwd'}
+  }
 ];
-
 let saved = null;
 try { saved = JSON.parse(localStorage.getItem(STORAGE_KEY) || 'null'); } catch (_) { saved = null; }
 function sanitizeTune(source, fallback) {
@@ -34,12 +41,14 @@ function sanitizeTune(source, fallback) {
     const candidate = source && Number(source[field.key]);
     result[field.key] = Number.isFinite(candidate) && candidate >= field.min && candidate <= field.max ? candidate : fallback[field.key];
   }
+  result.drivetrain = source && Object.hasOwn(DRIVE_MODES, source.drivetrain) ? source.drivetrain : fallback.drivetrain;
   return result;
 }
 const cars = CAR_PRESETS.map((preset, index) => ({
   ...preset, id:index, tune:sanitizeTune(saved && saved[index], preset.tune),
   speed:0, index:0, lap:0, finished:false, finishedAt:0, heading:0,
-  position:new THREE.Vector3(), visual:null, wheelParts:[], laneOffset:0, offroad:0
+  position:new THREE.Vector3(), visual:null, wheelParts:[], laneOffset:0, offroad:0,
+  physics:createVehicleState(),sector:0,rescueCount:0,stuckTime:0,slides:0,lastSlide:false,spinTime:0,penalty:0
 }));
 function saveGarage() {
   try { localStorage.setItem(STORAGE_KEY, JSON.stringify(cars.map(car => car.tune))); } catch (_) { /* storage may be disabled */ }
@@ -264,93 +273,165 @@ buildWorld();
 cars.forEach(buildCar);
 
 function resetRace() {
-  elapsed = 0;
-  timeAccumulator = 0;
-  mode = 'idle';
+  elapsed=0;
+  timeAccumulator=0;
+  mode='idle';
   cars.forEach((car,i) => {
-    car.index = 18 - i*5;
-    car.lap = 0;
-    car.speed = 0;
-    car.finished = false;
-    car.finishedAt = 0;
-    car.offroad = 0;
-    car.laneOffset = i%2 ? 1.75 : -1.75;
-    const p = pointWithOffset(car.index,car.laneOffset);
+    car.index=18-i*5;
+    car.lap=0;
+    car.speed=0;
+    car.finished=false;
+    car.finishedAt=0;
+    car.offroad=0;
+    car.sector=0;
+    car.rescueCount=0;
+    car.stuckTime=0;
+    car.slides=0;
+    car.lastSlide=false;
+    car.penalty=0;
+    car.laneOffset=i%2?1.75:-1.75;
+    const p=pointWithOffset(car.index,car.laneOffset);
+    const t=tangents[car.index];
+    car.heading=Math.atan2(t.x,t.z);
+    car.physics=createVehicleState(p.x,p.z,car.heading);
     car.position.set(p.x,0,p.z);
-    const t = tangents[car.index];
-    car.heading = Math.atan2(t.x,t.z);
-    car.visual.position.set(car.position.x,.09,car.position.z);
-    car.visual.rotation.y = car.heading;
+    car.visual.position.set(p.x,.09,p.z);
+    car.visual.rotation.set(0,car.heading,0);
   });
   syncControls();
   updateDashboard();
 }
-function drive(car,dt) {
-  if (car.finished) { car.speed = Math.max(0,car.speed-15*dt); return; }
-  const tune = car.tune;
-  const previous = car.index;
-  let index = nearestIndex(car.position,previous);
-  car.index = index;
-  if (previous > POINT_COUNT-14 && index < 14 && car.speed > 3) {
-    car.lap += 1;
-    if (car.lap === LAPS) {
-      car.finished = true;
-      car.finishedAt = elapsed;
-      car.speed = 0;
-      toast(car.name + ' franchit la ligne !');
-      if (cars.every(other => other.finished)) {
-        mode = 'finished';
-        const winner = [...cars].sort((a,b)=>a.finishedAt-b.finishedAt)[0];
-        toast('Victoire : ' + winner.name + ' !');
+function closestTrackIndex(position,previous,fullSearch=false) {
+  if (!fullSearch) return nearestIndex(position,previous,35);
+  let nearest=previous,dist=Infinity;
+  for(let i=0;i<POINT_COUNT;i++) {
+    const p=track[i],d=(p.x-position.x)**2+(p.z-position.z)**2;
+    if(d<dist){dist=d;nearest=i;}
+  }
+  return nearest;
+}
+function rescueCar(car,index) {
+  const p=pointWithOffset(index,car.laneOffset);
+  const t=tangents[index];
+  const angle=Math.atan2(t.x,t.z);
+  car.physics=createVehicleState(p.x,p.z,angle);
+  car.physics.vx=t.x*2;
+  car.physics.vz=t.z*2;
+  car.position.set(p.x,0,p.z);
+  car.heading=angle;
+  car.speed=2;
+  car.offroad=0;
+  car.stuckTime=0;
+  car.rescueCount++;
+  car.penalty+=6;
+  toast(car.name+' remise sur la piste (+6 s de pénalité).');
+}
+function checkGates(car,previous,index) {
+  const phys=car.physics;
+  const p=track[index];
+  const centerDistance=Math.hypot(phys.x-p.x,phys.z-p.z);
+  if(centerDistance>ROAD_WIDTH*.48 || car.offroad>.25) return;
+  const t=tangents[index];
+  const forward=phys.vx*t.x+phys.vz*t.z;
+  if(forward<2.8) return;
+  const gates=[105,210,315];
+  if(car.sector<3) {
+    const g=gates[car.sector];
+    if(previous<g && index>=g && index-previous<12)car.sector++;
+  } else if(previous>POINT_COUNT-12 && index<12) {
+    car.lap++;
+    car.sector=0;
+    if(car.lap>=LAPS) {
+      car.finished=true;
+      car.finishedAt=elapsed+car.penalty;
+      car.speed=0;
+      phys.vx=0;phys.vz=0;
+      toast(car.name+' termine en '+lapTime(car.finishedAt)+' !');
+      if(cars.every(other=>other.finished)) {
+        mode='finished';
+        const winner=[...cars].sort((a,b)=>a.finishedAt-b.finishedAt)[0];
+        toast('Vainqueur : '+winner.name+' !');
         syncControls();
       }
-      return;
     }
   }
-  const current = track[index];
-  const centerDistance = Math.hypot(car.position.x-current.x, car.position.z-current.z);
-  car.offroad = Math.max(0, centerDistance - ROAD_WIDTH/2 + .4);
-  const lookCount = clamp(Math.round((8 + car.speed * .38)/distancePerPoint),7,26);
-  const target = pointWithOffset(wrap(index + lookCount),car.laneOffset);
-  const angleToTarget = Math.atan2(target.x-car.position.x,target.z-car.position.z);
-  const error = angleDiff(angleToTarget,car.heading);
-  const ahead = tangents[wrap(index + lookCount)];
-  const behind = tangents[wrap(index - lookCount)];
-  const curve = Math.abs(angleDiff(Math.atan2(ahead.x,ahead.z),Math.atan2(behind.x,behind.z))) / (2*lookCount*distancePerPoint);
-  const cornerSpeed = Math.sqrt((33 * Math.pow(tune.grip,.85))/(curve+.023)) * (.77 + tune.steering*.22);
-  let targetSpeed = Math.min(tune.topSpeed,cornerSpeed);
-  if (car.offroad > 0) targetSpeed = Math.min(targetSpeed, 11 / (1+car.offroad*.045));
-  const acceleration = tune.power * .093 * Math.pow(100/tune.mass,.75);
-  const brakes = 10 + tune.grip*9;
-  car.speed += (car.speed < targetSpeed ? acceleration : -brakes) * dt;
-  car.speed -= car.speed*.013*dt;
-  car.speed = clamp(car.speed,0,tune.topSpeed);
-  const turnRate = (0.75 + 1.23*tune.steering) * Math.pow(tune.grip,.8) / (.65 + car.speed*.035);
-  car.heading += clamp(error*2.9,-turnRate,turnRate)*dt;
-  car.position.x += Math.sin(car.heading)*car.speed*dt;
-  car.position.z += Math.cos(car.heading)*car.speed*dt;
-  if (car.offroad > 2) car.speed *= (1 - Math.min(car.offroad*.027,.3)*dt);
-  car.visual.position.set(car.position.x,.09 + Math.sin(elapsed*12+car.id)*.018,car.position.z);
-  car.visual.rotation.y = car.heading;
-  for (const wheel of car.wheelParts) wheel.rotation.x += car.speed*dt*.5;
+}
+function drive(car,dt) {
+  if(car.finished) return;
+  const p=car.physics;
+  const previous=car.index;
+  const index=closestTrackIndex(p,previous,car.offroad>12);
+  car.index=index;
+  const current=track[index];
+  const centerDistance=Math.hypot(p.x-current.x,p.z-current.z);
+  car.offroad=Math.max(0,centerDistance-ROAD_WIDTH*.5+.7);
+
+  // The AI aims at the track, but cannot force the car to follow it.
+  const speed=p.speed;
+  const look=clamp(Math.round((7+speed*.55)/distancePerPoint),7,34);
+  const target=pointWithOffset(index+look,car.laneOffset);
+  const aim=Math.atan2(target.x-p.x,target.z-p.z);
+  const err=angleDiff(aim,p.heading);
+  const velocityHeading=speed>3?Math.atan2(p.vx,p.vz):p.heading;
+  const drift=angleDiff(velocityHeading,p.heading);
+  const steer=clamp(err*(2.1+car.tune.steering*.28)-p.yawRate*.26+drift*.38,-1,1);
+
+  const forward=tangents[wrap(index+look)];
+  const rear=tangents[wrap(index-Math.max(5,Math.floor(look/2)))];
+  const curve=Math.abs(angleDiff(Math.atan2(forward.x,forward.z),Math.atan2(rear.x,rear.z)))/
+    (Math.max(1,(look+Math.max(5,Math.floor(look/2)))*distancePerPoint));
+  const pressure=1-1.15*(car.tune.pressure-1)**2;
+  const effectiveGrip=Math.max(.35,car.tune.grip*car.chassis.nativeGrip*pressure);
+  const limitingSpeed=Math.sqrt(9.81*effectiveGrip/Math.max(.008,curve));
+  const possibleSpeed=car.tune.topSpeed*(1.32-.32*car.tune.gearing)*car.chassis.speedFactor;
+  const driverRisk=.74+.26*car.tune.aggression;
+  let desired=Math.min(possibleSpeed,limitingSpeed*driverRisk);
+  if(car.offroad>.5) desired=Math.min(desired,Math.max(5,11-car.offroad*.35));
+  if(Math.abs(drift)>.45) desired=Math.min(desired,Math.max(7,speed*.72));
+  const speedError=desired-speed;
+  const throttle=clamp(.18+speedError*.46,0,1);
+  const brake=clamp(-speedError*.52,0,1);
+  const oldRollOver=p.rollOver;
+  tuneVehicle(p,car.tune,car.chassis,{steer,throttle,brake},car.offroad,dt);
+  car.position.set(p.x,0,p.z);
+  car.heading=p.heading;
+  car.speed=p.speed;
+
+  if(p.slide&&!car.lastSlide)car.slides++;
+  car.lastSlide=p.slide;
+  if(p.rollOver>oldRollOver) {
+    car.penalty+=2;
+    toast(car.name+' vient de faire un tonneau !');
+  }
+  if(car.offroad>4 && p.speed<3.0)car.stuckTime+=dt;
+  else car.stuckTime=Math.max(0,car.stuckTime-dt*.5);
+  if(car.stuckTime>7 || car.offroad>38)rescueCar(car,index);
+  else checkGates(car,previous,index);
+  car.visual.position.set(car.position.x,.09+Math.sin(elapsed*12+car.id)*.018,car.position.z);
+  car.visual.rotation.set(0,car.heading,clamp(p.roll*.09,-.22,.22));
+  // Slipping wheels continue rotating after the body's heading diverges from travel direction.
+  for(const wheel of car.wheelParts)wheel.rotation.x+=p.speed*dt*.45;
 }
 function simulate(dt) {
-  elapsed += dt;
-  cars.forEach(car => drive(car,dt));
-  for (let i = 0; i < cars.length; i++) {
-    for (let j = i+1; j < cars.length; j++) {
-      const a = cars[i], b = cars[j];
-      if (a.finished || b.finished) continue;
-      const dx = a.position.x-b.position.x, dz = a.position.z-b.position.z;
-      const distance = Math.hypot(dx,dz);
-      if (distance > .05 && distance < 2.75) {
-        const push = (2.75-distance)*.28;
-        a.position.x += dx/distance*push;
-        a.position.z += dz/distance*push;
-        b.position.x -= dx/distance*push;
-        b.position.z -= dz/distance*push;
-        a.speed *= .994;
-        b.speed *= .994;
+  elapsed+=dt;
+  cars.forEach(car=>drive(car,dt));
+  // Simple impulse-based car contacts, without forcing cars back onto the circuit.
+  for(let i=0;i<cars.length;i++)for(let j=i+1;j<cars.length;j++){
+    const a=cars[i],b=cars[j];
+    if(a.finished||b.finished)continue;
+    const dx=a.physics.x-b.physics.x,dz=a.physics.z-b.physics.z;
+    const d=Math.hypot(dx,dz);
+    if(d<2.9&&d>.01){
+      const nx=dx/d,nz=dz/d;
+      const overlap=2.9-d;
+      const wa=b.tune.mass/(a.tune.mass+b.tune.mass),wb=1-wa;
+      a.physics.x+=nx*overlap*wa*.6;a.physics.z+=nz*overlap*wa*.6;
+      b.physics.x-=nx*overlap*wb*.6;b.physics.z-=nz*overlap*wb*.6;
+      const rv=(a.physics.vx-b.physics.vx)*nx+(a.physics.vz-b.physics.vz)*nz;
+      if(rv<0){
+        const impulse=-rv*.6;
+        a.physics.vx+=nx*impulse*wa;a.physics.vz+=nz*impulse*wa;
+        b.physics.vx-=nx*impulse*wb;b.physics.vz-=nz*impulse*wb;
       }
     }
   }
@@ -369,17 +450,30 @@ function renderCarCards() {
     '<span class="car-name">' + car.name + '</span><span class="car-number">' + car.code + '</span></button>').join('');
 }
 function renderTuners() {
-  const car = cars[selected];
-  $('selected-name').textContent = car.name;
-  $('selected-desc').textContent = car.code;
-  $('selected-color').style.backgroundColor = car.color;
-  $('tuners').innerHTML = TUNERS.map(t => {
-    const val = car.tune[t.key], fill = (val-t.min)/(t.max-t.min)*100;
-    return '<div class="tune-row"><div class="tune-line"><label for="tune-' + t.key + '">' + t.label + '</label>' +
-      '<output id="val-' + t.key + '">' + Number(val.toFixed(2)) + (t.unit?' '+t.unit:'') + '</output></div>' +
-      '<input type="range" id="tune-' + t.key + '" data-tune="' + t.key + '" min="' + t.min + '" max="' + t.max +
-      '" step="' + t.step + '" value="' + val + '" style="--fill:' + fill + '%"><div class="tune-description">' + t.desc + '</div></div>';
-  }).join('');
+  const car=cars[selected];
+  $('selected-name').textContent=car.name;
+  $('selected-desc').textContent=car.code;
+  $('selected-color').style.backgroundColor=car.color;
+  let group='';
+  let html='';
+  for(const t of TUNERS) {
+    if(t.group!==group) {
+      group=t.group;
+      html+='<div class="tune-group">'+group+'</div>';
+      if(group==='MOTEUR & TRANSMISSION') {
+        html+='<div class="drive-picker"><label for="drive-select">Roues motrices</label>'+
+          '<select id="drive-select" aria-label="Type de transmission">'+
+          Object.entries(DRIVE_MODES).map(([key,label])=>'<option value="'+key+'"'+(car.tune.drivetrain===key?' selected':'')+'>'+label+'</option>').join('')+
+          '</select><p>Traction : tire de l’avant · Propulsion : pousse de l’arrière · 4×4 : motricité supérieure, rendement réduit.</p></div>';
+      }
+    }
+    const val=car.tune[t.key],fill=(val-t.min)/(t.max-t.min)*100;
+    html+='<div class="tune-row"><div class="tune-line"><label for="tune-'+t.key+'">'+t.label+'</label>'+
+      '<output id="val-'+t.key+'">'+Number(val.toFixed(2))+(t.unit?' '+t.unit:'')+'</output></div>'+
+      '<input type="range" id="tune-'+t.key+'" data-tune="'+t.key+'" min="'+t.min+'" max="'+t.max+
+      '" step="'+t.step+'" value="'+val+'" style="--fill:'+fill+'%"><div class="tune-description">'+t.desc+'</div></div>';
+  }
+  $('tuners').innerHTML=html;
 }
 function selectCar(id) {
   if (!Number.isInteger(id) || id < 0 || id >= cars.length) return;
@@ -407,11 +501,18 @@ function updateDashboard() {
   }).join('');
   const car = cars[selected];
   const kph = Math.round(car.speed*3.6);
+  const slip = car.physics.slip;
   $('tele-speed').textContent = kph;
   $('speed-meter').style.width = Math.min(100,kph/(42*3.6)*100) + '%';
   $('tele-lap').textContent = Math.min(car.lap,LAPS) + ' / ' + LAPS;
   $('tele-offset').textContent = car.offroad.toFixed(1) + ' m';
+  const driveLabel=DRIVE_MODES[car.tune.drivetrain];
+  if ($('tele-slip')) $('tele-slip').textContent = Math.round(Math.abs(slip)) + '°';
+  if ($('tele-drive')) $('tele-drive').textContent = driveLabel;
+  if ($('tele-warnings')) $('tele-warnings').textContent = car.slides + ' glissades · ' + car.physics.rollOver + ' tonneaux · ' + car.rescueCount + ' remises en piste';
   $('tele-note').textContent = car.finished ? 'Voiture arrivée. Comparez son chrono aux autres.' :
+    car.physics.rollOver>0 && car.physics.speed<5 ? 'Tonneau ! Le centre de gravité et la suspension influencent la stabilité.' :
+    Math.abs(slip)>25 && car.speed>7 ? 'Dérapage important ! Les pneus glissent dans une autre direction que la carrosserie.' :
     car.offroad > 3 ? 'Attention : sortie de piste ! Essayez plus d’adhérence ou une direction moins nerveuse.' :
     car.speed > 18 ? 'En pleine course. Observez le comportement dans les prochains virages.' :
     'Les réglages modifient la vitesse, les freinages et les trajectoires.';
@@ -436,6 +537,15 @@ $('tuners').addEventListener('input', e => {
   e.target.style.setProperty('--fill', (value-def.min)/(def.max-def.min)*100 + '%');
   $('val-'+key).textContent = Number(value.toFixed(2)) + (def.unit ? ' '+def.unit : '');
   saveGarage();
+  updateDashboard();
+});
+$('tuners').addEventListener('change',e=>{
+  if(e.target.id!=='drive-select')return;
+  if(!Object.hasOwn(DRIVE_MODES,e.target.value))return;
+  cars[selected].tune.drivetrain=e.target.value;
+  saveGarage();
+  updateDashboard();
+  toast('Transmission : '+DRIVE_MODES[e.target.value]);
 });
 $('reset-tune').addEventListener('click', () => {
   cars[selected].tune = { ...CAR_PRESETS[selected].tune };
@@ -447,7 +557,8 @@ $('randomize').addEventListener('click', () => {
     const slots = Math.round((tune.max-tune.min)/tune.step);
     current.tune[tune.key] = Number((tune.min+Math.floor(Math.random()*(slots+1))*tune.step).toFixed(2));
   }
-  saveGarage(); renderTuners(); toast('Configuration expérimentale créée !');
+  current.tune.drivetrain=['fwd','rwd','awd'][Math.floor(Math.random()*3)];
+  saveGarage(); renderTuners(); updateDashboard(); toast('Configuration expérimentale créée !');
 });
 $('start-button').addEventListener('click',toggleRace);
 $('reset-race').addEventListener('click',() => { resetRace(); toast('Circuit réinitialisé. Prêt pour un nouvel essai.'); });
