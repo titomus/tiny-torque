@@ -9,6 +9,28 @@ export const DEFAULT_RUNOFF = 2.5;
 export const DEFAULT_CAR_RADIUS = 1.30;
 export const WALL_HEIGHT = 1.55;
 
+/**
+ * Smooth a closed racing line so a continuous offset guardrail never folds
+ * back into the tarmac at extremely sharp bends. This is a periodic Gaussian
+ * filter, preserving the original point count and cyclic indices.
+ */
+export function smoothClosedTrack(points, sigma = 7) {
+  if (!Number.isFinite(sigma) || sigma <= 0) return points.map(p=>({x:p.x,z:p.z}));
+  if (!Array.isArray(points) || points.length < 3) throw new Error('Closed track needs three points');
+  const radius=Math.min(Math.floor((points.length-1)/2),Math.ceil(sigma*3));
+  const weights=Array.from({length:radius*2+1},(_,i)=>
+    Math.exp(-.5*((i-radius)/sigma)**2));
+  const sum=weights.reduce((a,b)=>a+b,0);
+  return points.map((point,i)=>{
+    let x=0,z=0;
+    for(let k=-radius;k<=radius;k++){
+      const p=points[(i+k+points.length)%points.length],w=weights[k+radius];
+      x+=p.x*w;z+=p.z*w;
+    }
+    return {x:x/sum,z:z/sum};
+  });
+}
+
 export function createGuardrailTrack(center, roadWidth, runoff = DEFAULT_RUNOFF) {
   if (!Array.isArray(center) || center.length < 3) {
     throw new Error('At least three centerline points are required');
