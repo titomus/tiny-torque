@@ -1,5 +1,6 @@
 import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.180.0/build/three.module.js';
 import { DRIVE_MODES, TUNE_FIELDS, createVehicleState, tuneVehicle } from './physics.mjs';
+import { createGuardrailTrack, collideWithGuardrails, WALL_HEIGHT } from './guardrails.mjs';
 
 const $ = (id) => document.getElementById(id);
 const STORAGE_KEY = 'tinytorque-garage-v1'; // Migrates existing settings by individual field.
@@ -49,7 +50,7 @@ const cars = CAR_PRESETS.map((preset, index) => ({
   ...preset, id:index, tune:sanitizeTune(saved && saved[index], preset.tune),
   speed:0, index:0, lap:0, finished:false, finishedAt:0, heading:0,
   position:new THREE.Vector3(), visual:null, wheelParts:[], laneOffset:0, offroad:0,
-  physics:createVehicleState(),sector:0,rescueCount:0,stuckTime:0,slides:0,lastSlide:false,spinTime:0,penalty:0,dnf:false,dustCooldown:0
+  physics:createVehicleState(),sector:0,rescueCount:0,stuckTime:0,slides:0,lastSlide:false,spinTime:0,penalty:0,dnf:false,dustCooldown:0,wallHits:0
 }));
 function saveGarage() {
   try { localStorage.setItem(STORAGE_KEY, JSON.stringify(cars.map(car => car.tune))); } catch (_) { /* storage may be disabled */ }
@@ -100,6 +101,7 @@ const tangents = Array.from({ length:POINT_COUNT }, (_,i) => {
 });
 const lengthOfTrack = path.getLength();
 const distancePerPoint = lengthOfTrack / POINT_COUNT;
+const guardrails = createGuardrailTrack(track, ROAD_WIDTH, 2.5);
 function pointWithOffset(index, offset = 0) {
   const i = wrap(index), p = track[i], t = tangents[i];
   return new THREE.Vector3(p.x + t.z * offset, 0, p.z - t.x * offset);
@@ -155,6 +157,51 @@ function buildWorld() {
       scene.add(curb);
     }
   }
+  // Twin continuous crash barriers. Their vertices are shared with the collision model.
+  const guardMeshMaterial = new THREE.MeshStandardMaterial({
+    color:'#a5b3bc',metalness:.52,roughness:.43,side:THREE.DoubleSide
+  });
+  const stripeMaterial = new THREE.MeshStandardMaterial({
+    vertexColors:true,metalness:.18,roughness:.61,side:THREE.DoubleSide
+  });
+  function railRibbon(points,low,high,material,striped=false) {
+    const positions=[],indices=[],colors=[];
+    const colorA=new THREE.Color('#f6f0da'),colorB=new THREE.Color('#e35b57');
+    for(let i=0;i<POINT_COUNT;i++) {
+      const a=points[i],b=points[(i+1)%POINT_COUNT],j=i*4;
+      positions.push(a.x,low,a.z,a.x,high,a.z,b.x,low,b.z,b.x,high,b.z);
+      indices.push(j,j+2,j+1,j+1,j+2,j+3);
+      if(striped) {
+        const color=(Math.floor(i/5)%2) ? colorA : colorB;
+        for(let k=0;k<4;k++)colors.push(color.r,color.g,color.b);
+      }
+    }
+    const geometry=new THREE.BufferGeometry();
+    geometry.setAttribute('position',new THREE.Float32BufferAttribute(positions,3));
+    geometry.setIndex(indices);
+    if(striped)geometry.setAttribute('color',new THREE.Float32BufferAttribute(colors,3));
+    geometry.computeVertexNormals();
+    scene.add(new THREE.Mesh(geometry,material));
+  }
+  for(const side of guardrails.sides) {
+    railRibbon(side.points,.16,WALL_HEIGHT,guardMeshMaterial);
+    railRibbon(side.points,1.18,WALL_HEIGHT+.04,stripeMaterial,true);
+  }
+  // Lightweight instanced support posts keep the barrier readable from a distance.
+  const postEvery=10;
+  const postCount=Math.ceil(POINT_COUNT/postEvery)*guardrails.sides.length;
+  const posts=new THREE.InstancedMesh(
+    new THREE.BoxGeometry(.38,WALL_HEIGHT+.55,.38),mat('#536470',.56),postCount
+  );
+  const postMatrix=new THREE.Matrix4();
+  let postIndex=0;
+  for(const side of guardrails.sides)for(let i=0;i<POINT_COUNT;i+=postEvery) {
+    const p=side.points[i];
+    postMatrix.makeTranslation(p.x,(WALL_HEIGHT+.55)/2,p.z);
+    posts.setMatrixAt(postIndex++,postMatrix);
+  }
+  posts.instanceMatrix.needsUpdate=true;
+  scene.add(posts);
   const paintMaterial = mat('#d9ddd6');
   for (let i = 15; i < POINT_COUNT; i += 13) {
     const line = new THREE.Mesh(new THREE.BoxGeometry(0.18,0.035,3.5),paintMaterial);
@@ -323,6 +370,7 @@ function resetRace() {
     car.penalty=0;
     car.dnf=false;
     car.dustCooldown=0;
+    car.wallHits=0;
     car.laneOffset=i%2?1.75:-1.75;
     const p=pointWithOffset(car.index,car.laneOffset);
     const t=tangents[car.index];
@@ -431,6 +479,13 @@ function drive(car,dt) {
   const safeThrottle=throttle*driveAid;
   const oldRollOver=p.rollOver;
   tuneVehicle(p,car.tune,car.chassis,{steer,throttle:safeThrottle,brake},car.offroad,dt);
+  // Resolve genuine lateral crashes and glancing contact, never snap onto a racing line.
+  const collision=collideWithGuardrails(p,guardrails,previous,dt);
+  if(collision.impacts) {
+    car.wallHits+=collision.impacts;
+    car.penalty+=collision.maxImpact>12 ? 1 : 0;
+    car.dustCooldown=0;
+  }
   car.position.set(p.x,0,p.z);
   car.heading=p.heading;
   car.speed=p.speed;
@@ -491,6 +546,17 @@ function simulate(dt) {
         b.physics.vx-=nx*impulse*wb;b.physics.vz-=nz*impulse*wb;
       }
     }
+  }
+  // A rival can shove a car toward the wall after its own movement step.
+  // Apply an additional narrow-phase pass so impacts cannot push either car through.
+  for(const car of cars) {
+    if(car.finished)continue;
+    const hit=collideWithGuardrails(car.physics,guardrails,car.index,dt);
+    if(hit.impacts)car.wallHits+=hit.impacts;
+    car.position.set(car.physics.x,0,car.physics.z);
+    car.speed=car.physics.speed;
+    car.visual.position.x=car.physics.x;
+    car.visual.position.z=car.physics.z;
   }
 }
 function rankCars() {
@@ -566,8 +632,8 @@ function updateDashboard() {
   const driveLabel=DRIVE_MODES[car.tune.drivetrain];
   if ($('tele-slip')) $('tele-slip').textContent = Math.round(Math.abs(slip)) + '°';
   if ($('tele-drive')) $('tele-drive').textContent = driveLabel;
-  if ($('tele-warnings')) $('tele-warnings').textContent = car.slides + ' glissades · ' + car.physics.rollOver + ' tonneaux · ' + car.rescueCount + ' remises en piste';
-  $('tele-note').textContent = car.dnf ? 'Le temps limite est atteint : cette voiture abandonne.' : car.finished ? 'Voiture arrivée. Comparez son chrono aux autres.' :
+  if ($('tele-warnings')) $('tele-warnings').textContent = car.wallHits + ' chocs barrière · ' + car.slides + ' glissades · ' + car.rescueCount + ' secours';
+  $('tele-note').textContent = car.wallHits>0 && car.physics.speed<8 ? 'Impact contre les barrières : la voiture ralentit et doit retrouver sa trajectoire.' : car.dnf ? 'Le temps limite est atteint : cette voiture abandonne.' : car.finished ? 'Voiture arrivée. Comparez son chrono aux autres.' :
     car.physics.rollOver>0 && car.physics.speed<5 ? 'Tonneau ! Le centre de gravité et la suspension influencent la stabilité.' :
     Math.abs(slip)>25 && car.speed>7 ? 'Dérapage important ! Les pneus glissent dans une autre direction que la carrosserie.' :
     car.offroad > 3 ? 'Attention : sortie de piste ! Essayez plus d’adhérence ou une direction moins nerveuse.' :
