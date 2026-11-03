@@ -4,7 +4,7 @@
 
 Un jeu original de voitures radiocommandées conçu autour d'une idée : **vous réglez les véhicules, les pilotes automatiques les mettent à l'épreuve**.
 
-## Prototype v0.3
+## Prototype v0.4
 
 - Circuit et voitures en **3D** avec Three.js
 - **4 voitures** dont les paramètres sont modifiables séparément
@@ -20,6 +20,11 @@ Un jeu original de voitures radiocommandées conçu autour d'une idée : **vous 
 - Caméras **TV**, **suivi** et **dessus**
 - Accélération de la simulation : **1×, 3× ou 8×**
 - Sauvegarde locale des réglages et **import/export JSON**
+- **Records au tour par voiture** et record absolu du garage, sauvegardés dans le navigateur
+- Chronométrage des tours *complets* uniquement (le premier tour sert à lancer le chrono)
+- Pseudo facultatif du constructeur, lui aussi gardé localement
+- Bouton **Copier mon défi pour X** : partage un lien contenant le chrono, la voiture et le pseudo
+- Un visiteur ouvrant le lien voit le défi à battre, sans créer de compte
 
 Les modifications changent réellement le comportement des voitures. Contrairement à la v0.1, l'orientation de la carrosserie et la vitesse sont indépendantes : une voiture peut glisser latéralement. La transmission avant/arriére/4×4 répartit la force sur les essieux, qui disposent chacun d'un budget d'adhérence partagé entre accélérer/freiner et tourner.
 
@@ -37,6 +42,20 @@ Le moteur reste une **approximation arcade du modèle dynamique à deux essieux*
 - Tests géométriques contre les traversées à grande vitesse, les chocs directs, les contacts répétés et les rails inversés dans les épingles.
 
 La collision contre les rails est simulée en 2D. Les protections ne sont pas des objets rigides 3D destructibles.
+
+### Records & défis sociaux (v0.4)
+
+Chaque joueur garde ses réglages dans `localStorage['tinytorque-garage-v1']`, ses records dans `localStorage['tinytorque-lap-records-v1']` et son pseudo dans `localStorage['tinytorque-driver-v1']`.
+
+- Un record est chronométré entre **deux franchissements consécutifs de la ligne**, après validation des checkpoints.
+- Le tour partiel depuis la grille ne compte pas pour les records.
+- Le tour est invalidé pour les records en cas de **remise en piste** ou **modification des réglages pendant le tour**.
+- Les records sont associés à un identifiant de version du circuit, pour ne pas comparer des tracés différents.
+- En ouvrant un lien contenant un défi, le temps à battre s'affiche, mais **n'est jamais automatiquement enregistré comme record local**.
+- Le temps partagé dans l'URL est une **déclaration non vérifiée** : il est modifiable par quiconque.
+- GitHub Pages est statique : **il n'existe pas de classement mondial partagé**. Pour cela, il faudra un service côté serveur avec validation des chronos, limitation des abus et une base de données.
+
+Ces données restent uniquement sur le navigateur du joueur (hors action explicite « Copier mon défi »). Elles peuvent disparaître s'il efface les données du site, utilise la navigation privée ou un autre navigateur.
 
 ## Jouer
 
