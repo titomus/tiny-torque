@@ -75,7 +75,7 @@ export function tuneVehicle(state, tune, chassis, controls, offroad, dt) {
   const capF = Math.sqrt(Math.max(0,maxF*maxF-fxF*fxF));
   const capR = Math.sqrt(Math.max(0,maxR*maxR-fxR*fxR));
 
-  const a = wb*(1-frontFraction), b=wb*frontFraction;
+  const a = wb*(1-chassis.frontWeight), b=wb*chassis.frontWeight;
   // Small denominator for numerical stability, while retaining true wheel sideslip.
   const denominator = Math.max(3.3,Math.abs(vF));
   const slipF = Math.atan2(vS+a*state.yawRate,denominator)-delta;
