@@ -25,7 +25,7 @@ export function formatLap(seconds) {
 }
 export function sanitizeDriver(value) {
   if(typeof value!=='string')return 'Anonyme';
-  const name=value.trim().replace(/[\r\n\t<>]/g,' ').replace(/\s+/g,' ').slice(0,24);
+  const name=value.replace(/[\r\n\t<>]/g,' ').replace(/\s+/g,' ').trim().slice(0,24);
   return name || 'Anonyme';
 }
 export function validLapSeconds(seconds) {
