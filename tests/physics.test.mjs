@@ -38,7 +38,10 @@ test('4WD, front drive and rear drive have different launch acceleration',()=>{
 });
 
 test('lighter car accelerates faster',()=>{
-  assert.ok(sample({mass:75}).speed > sample({mass:145}).speed);
+  // In a power-limited configuration, a lighter chassis accelerates faster.
+  const light=sample({drivetrain:'awd',power:55,grip:1.5,mass:75});
+  const heavy=sample({drivetrain:'awd',power:55,grip:1.5,mass:145});
+  assert.ok(light.speed > heavy.speed+3);
 });
 
 test('loss of road traction changes behavior',()=>{
@@ -48,8 +51,8 @@ test('loss of road traction changes behavior',()=>{
 });
 
 test('gearing trades acceleration for maximum speed',()=>{
-  const short=sample({gearing:1.4},{time:2});
-  const tall=sample({gearing:.7},{time:2});
+  const short=sample({drivetrain:'awd',power:55,grip:1.5,gearing:1.4},{time:2});
+  const tall=sample({drivetrain:'awd',power:55,grip:1.5,gearing:.7},{time:2});
   assert.ok(short.speed > tall.speed,'Short gears should accelerate faster from rest');
 });
 
