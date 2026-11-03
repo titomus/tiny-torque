@@ -28,6 +28,7 @@ jobs:
           node --check assets/app.js
           node --check assets/physics.mjs
           node --check assets/guardrails.mjs
+          node --check assets/track.mjs
       - name: Run vehicle physics regression tests
         run: node --test tests/*.test.mjs
       - name: Configure Pages
