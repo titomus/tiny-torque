@@ -78,3 +78,36 @@ test('a shared challenge is visible in the URL without writing a global record',
   assert.equal(readChallenge('?tt_time=Infinity&tt_car=1'),null);
 });
 
+
+
+test('X username is optional and validated separately from the garage nickname',async()=>{
+  const {sanitizeXHandle}=await import('../assets/records.mjs');
+  assert.equal(sanitizeXHandle('@Titom'),'Titom');
+  assert.equal(sanitizeXHandle('  @MY_Name_3  '),'MY_Name_3');
+  for(const bad of ['','@','bad-handle','bad.handle','1234567890123456','@name with spaces','@<script>']) {
+    assert.equal(sanitizeXHandle(bad),'',bad);
+  }
+});
+
+test('X mention makes a share clickable without mentioning an unknown account',async()=>{
+  const {makeShareText,buildChallengeLink,readChallenge}=await import('../assets/records.mjs');
+  const entry={carId:0,time:28.167,driver:'Titom',xHandle:'Titom',tune:{drivetrain:'rwd'}};
+  const url=buildChallengeLink(entry,'https://titomus.github.io/tiny-torque/');
+  const text=makeShareText({entry,carName:'Kestrel GT',driveName:'propulsion AR',url});
+  assert.ok(text.startsWith('🏁 RECORD À BATTRE : 00:28.16'));
+  assert.ok(text.includes('👤 @Titom · Kestrel GT (propulsion AR)'));
+  assert.equal(readChallenge(new URL(url).search).xHandle,'Titom');
+  const noMention=makeShareText({entry:{...entry,xHandle:''},carName:'Kestrel GT',
+    driveName:'propulsion AR',url});
+  assert.ok(noMention.includes('👤 Titom · Kestrel GT'));
+  assert.ok(!noMention.includes('@Titom'));
+});
+
+test('record save and restore keeps an explicit handle but not an invented one',()=>{
+  const b=newRecordBook();
+  submitLap(b,{carId:0,time:29,driver:'Titom',xHandle:'@Titom',tune:{}});
+  submitLap(b,{carId:1,time:31,driver:'Other',tune:{}});
+  const copy=restoreRecordBook(JSON.parse(JSON.stringify(b)));
+  assert.equal(copy.bestByCar[0].xHandle,'Titom');
+  assert.equal(copy.bestByCar[1].xHandle,'');
+});
