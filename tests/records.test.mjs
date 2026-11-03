@@ -72,7 +72,7 @@ test('a shared challenge is visible in the URL without writing a global record',
   assert.equal(parsed.pathname,'/tiny-torque/');
   assert.equal(parsed.hash,'');
   assert.equal(parsed.searchParams.get('old'),null);
-  assert.deepEqual(readChallenge(parsed.search),{time:31.478,carId:2,driver:'Mécano RC'});
+  assert.deepEqual(readChallenge(parsed.search),{time:31.478,carId:2,driver:'Mécano RC',xHandle:''});
   assert.equal(readChallenge('?tt_time=1&tt_car=2'),null);
   assert.equal(readChallenge('?tt_time=36&tt_car=999'),null);
   assert.equal(readChallenge('?tt_time=Infinity&tt_car=1'),null);
