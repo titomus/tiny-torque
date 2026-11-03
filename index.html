@@ -6,7 +6,7 @@
   <meta name="theme-color" content="#0d1119">
   <meta name="description" content="TinyTorque, le laboratoire de voitures RC. Traction, propulsion, pneus et dérapages : réglez vos bolides et observez les pilotes IA.">
   <title>TinyTorque — Build. Tune. Race. Repeat.</title>
-  <link rel="stylesheet" href="./assets/style.css?v=0.4.1">
+  <link rel="stylesheet" href="./assets/style.css?v=0.4.2">
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='16' fill='%230d1119'/%3E%3Cpath d='M8 42l8-19h32l8 19H8z' fill='%23f7c75b'/%3E%3Ccircle cx='18' cy='44' r='7' fill='%23fff'/%3E%3Ccircle cx='46' cy='44' r='7' fill='%23fff'/%3E%3C/svg%3E">
 </head>
 <body>
@@ -35,7 +35,7 @@
         <button id="import" type="button">Importer un profil ↙</button>
         <input id="file-input" type="file" accept=".json,application/json" hidden>
       </div>
-      <footer class="side-footer"><span>TOUT EST SAUVEGARDÉ LOCALEMENT</span><span>V0.4.1</span></footer>
+      <footer class="side-footer"><span>TOUT EST SAUVEGARDÉ LOCALEMENT</span><span>V0.4.2</span></footer>
     </aside>
     <main class="main">
       <header class="topbar">
@@ -85,6 +85,9 @@
         <div class="record-cars" id="record-cars" aria-label="Meilleur temps de chaque voiture"></div>
         <label for="driver-name" class="record-label">NOM DU CONSTRUCTEUR</label>
         <input type="text" maxlength="24" id="driver-name" autocomplete="nickname" placeholder="Votre pseudo" aria-describedby="record-storage">
+        <label for="x-handle" class="record-label record-label-x">COMPTE X <span>(FACULTATIF)</span></label>
+        <input type="text" maxlength="16" id="x-handle" autocomplete="off" autocapitalize="none" spellcheck="false" placeholder="@votre_identifiant" aria-describedby="x-help">
+        <p id="x-help" class="x-help">Votre @identifiant apparaîtra comme une mention cliquable sur X. Jamais deviné à partir de votre pseudo.</p>
         <button class="share-record" type="button" id="share-record" disabled><span>↗</span> Copier mon défi pour X</button>
         <p id="record-storage" class="record-storage">Records et réglages privés, conservés uniquement dans ce navigateur. Aucun classement mondial pour l'instant.</p>
       </section>
@@ -98,6 +101,6 @@
   </div>
   <div id="toast" class="toast" role="status" aria-live="polite"></div>
   <noscript>Activez JavaScript pour utiliser le simulateur TinyTorque.</noscript>
-  <script type="module" src="./assets/app.js?v=0.4.1"></script>
+  <script type="module" src="./assets/app.js?v=0.4.2"></script>
 </body>
 </html>
