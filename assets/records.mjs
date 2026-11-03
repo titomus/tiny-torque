@@ -5,6 +5,7 @@
  */
 export const RECORDS_KEY = 'tinytorque-lap-records-v1';
 export const DRIVER_KEY = 'tinytorque-driver-v1';
+export const X_HANDLE_KEY = 'tinytorque-x-handle-v1';
 export const TRACK_ID = 'backyard-circuit-v0.3.1';
 export const MAX_VALID_LAP = 240;
 export const MIN_VALID_LAP = 8;
@@ -28,6 +29,12 @@ export function sanitizeDriver(value) {
   const name=value.replace(/[\r\n\t<>]/g,' ').replace(/\s+/g,' ').trim().slice(0,24);
   return name || 'Anonyme';
 }
+/** Never invent an X account from a nickname. Mentions are explicit opt-in. */
+export function sanitizeXHandle(value) {
+  if(typeof value!=='string')return '';
+  const handle=value.trim().replace(/^@/,'');
+  return /^[a-zA-Z0-9_]{1,15}$/.test(handle) ? handle : '';
+}
 export function validLapSeconds(seconds) {
   return typeof seconds==='number' && Number.isFinite(seconds) && seconds>=MIN_VALID_LAP && seconds<=MAX_VALID_LAP;
 }
@@ -42,6 +49,7 @@ export function restoreRecordBook(raw) {
       carId:i,
       time:entry.time,
       driver:sanitizeDriver(entry.driver),
+      xHandle:sanitizeXHandle(entry.xHandle),
       at:typeof entry.at==='string'?entry.at.slice(0,32):'',
       tune:entry.tune && typeof entry.tune==='object' ? JSON.parse(JSON.stringify(entry.tune)) : {}
     };
@@ -53,7 +61,7 @@ export function restoreRecordBook(raw) {
 export function fastestRecord(book) {
   return book.bestByCar.filter(Boolean).sort((a,b)=>a.time-b.time)[0] ?? null;
 }
-export function submitLap(book, {carId,time,driver,at,tune}) {
+export function submitLap(book, {carId,time,driver,at,tune,xHandle}) {
   if(!Number.isInteger(carId) || carId<0 || carId>3 || !validLapSeconds(time)) {
     return {accepted:false,personalBest:false,overallBest:false};
   }
@@ -65,6 +73,7 @@ export function submitLap(book, {carId,time,driver,at,tune}) {
   if(personalBest) {
     book.bestByCar[carId]={
       carId,time,driver:sanitizeDriver(driver),
+      xHandle:sanitizeXHandle(xHandle),
       at:typeof at==='string'?at.slice(0,32):'',
       tune:JSON.parse(JSON.stringify(tune || {}))
     };
@@ -79,6 +88,8 @@ export function buildChallengeLink(entry, currentUrl) {
   url.searchParams.set('tt_time',entry.time.toFixed(3));
   url.searchParams.set('tt_car',String(entry.carId));
   url.searchParams.set('tt_by',sanitizeDriver(entry.driver));
+  const xHandle=sanitizeXHandle(entry.xHandle);
+  if(xHandle)url.searchParams.set('tt_x',xHandle);
   return url.toString();
 }
 export function readChallenge(search) {
@@ -87,9 +98,18 @@ export function readChallenge(search) {
   const time=Number(params.get('tt_time'));
   const carId=Number(params.get('tt_car'));
   if(!validLapSeconds(time)||!Number.isInteger(carId)||carId<0||carId>3)return null;
-  return {time,carId,driver:sanitizeDriver(params.get('tt_by'))};
+  return {time,carId,driver:sanitizeDriver(params.get('tt_by')),
+    xHandle:sanitizeXHandle(params.get('tt_x'))};
 }
 
+export function makeShareText({entry,carName,driveName,url,xHandle}) {
+  if(!entry || !validLapSeconds(entry.time))return '';
+  const mention=sanitizeXHandle(xHandle ?? entry.xHandle);
+  const author=mention?'@'+mention:sanitizeDriver(entry.driver);
+  return '🏁 RECORD À BATTRE : '+formatLap(entry.time)+'\n'+
+    '👤 '+author+' · '+carName+' ('+driveName+')\n'+
+    'Qui fera mieux ?\n'+url+'\n#TinyTorque #RCCars';
+}
 export function lapCrossing(car, elapsed) {
   // First pass of the finish line establishes the starting reference.
   // Starting grid cars sit past the line, so their opening partial lap
