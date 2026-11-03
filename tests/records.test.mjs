@@ -49,7 +49,7 @@ test('browser records can be saved, restored and safely displayed',()=>{
   const b=newRecordBook();
   submitLap(b,{carId:3,time:69.278,driver:'  <ME>  ',at:'2026-11-03',tune:{drivetrain:'rwd'}});
   const restored=restoreRecordBook(JSON.parse(JSON.stringify(b)));
-  assert.equal(restored.bestByCar[3].driver,' ME ');
+  assert.equal(restored.bestByCar[3].driver,'ME');
   assert.equal(formatLap(restored.bestByCar[3].time),'01:09.27');
   assert.equal(formatLap(null),'--:--.--');
   assert.equal(sanitizeDriver(''),'Anonyme');
