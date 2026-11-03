@@ -138,3 +138,12 @@
   .results-panel > .results-top{padding:24px 2px 14px}
   .record-main strong{font-size:38px}
 }
+
+
+/* v0.4.2: X handle is opt-in, never inferred from the garage nickname. */
+.record-label-x{margin-top:13px}
+.record-label-x span{color:#7f968e;font-weight:400;font-size:9px}
+#x-handle{display:block;width:100%;min-width:0;background:#141d25;border:1px solid #526357;
+  border-radius:4px;color:#f1d37f;padding:10px 11px;font:600 12px 'DM Mono',monospace}
+#x-handle::placeholder{color:#788780;font-weight:400}
+.x-help{margin:6px 0 2px;color:#9faeaa;font-size:9px;line-height:1.55}
