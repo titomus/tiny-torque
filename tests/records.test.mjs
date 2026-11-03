@@ -62,3 +62,19 @@ test('records are versioned, and invalid imported data is discarded',()=>{
   assert.equal(b.bestByCar[1].time,32);
   assert.equal(b.lapsRecorded,0);
 });
+
+test('a shared challenge is visible in the URL without writing a global record',async()=>{
+  const {buildChallengeLink,readChallenge}=await import('../assets/records.mjs');
+  const entry={time:31.478,carId:2,driver:'Mécano RC'};
+  const url=buildChallengeLink(entry,'https://titomus.github.io/tiny-torque/?old=true#foo');
+  const parsed=new URL(url);
+  assert.equal(parsed.origin,'https://titomus.github.io');
+  assert.equal(parsed.pathname,'/tiny-torque/');
+  assert.equal(parsed.hash,'');
+  assert.equal(parsed.searchParams.get('old'),null);
+  assert.deepEqual(readChallenge(parsed.search),{time:31.478,carId:2,driver:'Mécano RC'});
+  assert.equal(readChallenge('?tt_time=1&tt_car=2'),null);
+  assert.equal(readChallenge('?tt_time=36&tt_car=999'),null);
+  assert.equal(readChallenge('?tt_time=Infinity&tt_car=1'),null);
+});
+
