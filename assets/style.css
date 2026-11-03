@@ -118,18 +118,20 @@
 .record-holder{margin-top:9px}
 .record-cars{margin-top:12px;margin-bottom:12px}
 .record-storage{margin-bottom:0}
-@media(max-width:1350px){
+@media(min-width:1021px) and (max-width:1350px){
   .app{grid-template-columns:298px minmax(360px,1fr) 300px}
 }
 @media(min-width:1351px){
   .app{grid-template-columns:338px minmax(390px,1fr) 326px}
 }
-@media(max-width:1020px){
-  .results-panel > .record-panel{
-    grid-column:1/-1;grid-row:auto;margin:18px 0 0;
-  }
-  .results-panel > .results-top{grid-column:1/-1;grid-row:auto}
+@media(min-width:691px) and (max-width:1020px){
   .results-panel{grid-auto-flow:row;align-content:start}
+  .results-panel > .record-panel{grid-column:1/-1;grid-row:1;margin:18px 0 0}
+  .results-panel > .results-top{grid-column:1/-1;grid-row:2}
+  .results-panel > .leaderboard-top{grid-column:1;grid-row:3}
+  .results-panel > .leaderboard{grid-column:1;grid-row:4}
+  .results-panel > .telemetry{grid-column:2;grid-row:3 / 5}
+  .results-panel > .right-footer{grid-column:1/-1;grid-row:5}
 }
 @media(max-width:690px){
   .results-panel > .record-panel{margin:16px 0 0}
