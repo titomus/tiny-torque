@@ -4,7 +4,8 @@ import { createGuardrailTrack, collideWithGuardrails, smoothClosedTrack, WALL_HE
 import { TRACK_CONTROL_POINTS } from './track.mjs';
 import {
   RECORDS_KEY, DRIVER_KEY, newRecordBook, restoreRecordBook,
-  formatLap, sanitizeDriver, submitLap, fastestRecord, lapCrossing
+  formatLap, sanitizeDriver, submitLap, fastestRecord, lapCrossing,
+  buildChallengeLink, readChallenge
 } from './records.mjs';
 
 const $ = (id) => document.getElementById(id);
@@ -682,6 +683,14 @@ function updateDashboard() {
     'Les réglages modifient la vitesse, les freinages et les trajectoires.';
   $('timer').textContent = lapTime(elapsed);
 }
+const incomingChallenge=readChallenge(window.location.search);
+function showIncomingChallenge() {
+  if(!incomingChallenge)return;
+  $('incoming-challenge').hidden=false;
+  $('incoming-time').textContent=formatLap(incomingChallenge.time);
+  $('incoming-from').textContent=incomingChallenge.driver+' · '+
+    CAR_PRESETS[incomingChallenge.carId].name+' · À battre !';
+}
 function renderRecordBoard() {
   const best=fastestRecord(recordBook);
   const sessionBest=cars.reduce((acc,car)=>
@@ -770,7 +779,7 @@ $('share-record').addEventListener('click',async()=>{
   if(!best)return;
   const drive=best.tune?.drivetrain==='fwd'?'traction AV':
     best.tune?.drivetrain==='awd'?'4×4':'propulsion AR';
-  const link='https://titomus.github.io/tiny-torque/';
+  const link=buildChallengeLink(best,window.location.href);
   const shareText='Mon record TinyTorque : '+formatLap(best.time)+' avec '+
     CAR_PRESETS[best.carId].name+' ('+drive+'). Et toi, tu fais mieux ?\n'+link+
     '\n#TinyTorque #RCCars';
@@ -782,6 +791,7 @@ $('share-record').addEventListener('click',async()=>{
     window.prompt('Copiez votre défi pour X :',shareText);
   }
 });
+showIncomingChallenge();
 renderRecordBoard();
 $('export').addEventListener('click', () => {
   const payload = {app:'TinyTorque',version:1,cars:cars.map(c => ({name:c.name,tune:c.tune}))};
