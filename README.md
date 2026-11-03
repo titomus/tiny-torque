@@ -30,10 +30,11 @@ Le moteur reste une **approximation arcade du modèle dynamique à deux essieux*
 ### Protections de piste (v0.3)
 
 - Deux glissières métalliques continues avec bandes rouges/blanches, de part et d'autre de la piste.
+- Les virages trop serrés du tracé sont légèrement adoucis pour éviter que les rails intérieurs se replient sur eux-mêmes et piègent les voitures.
 - Bas-côté en herbe entre l'asphalte et les barrières : on peut déraper hors piste, mais plus traverser les jardins pour couper.
 - Chocs latéraux : recul sur l'axe normal, ralentissement tangentiel et petite impulsion de rotation.
 - Rembourrage de collision du véhicule, vérification complémentaire après les chocs entre voitures, impacts dénombrés en télémétrie.
-- Tests géométriques contre les traversées à grande vitesse, les chocs directs et les contacts répétés.
+- Tests géométriques contre les traversées à grande vitesse, les chocs directs, les contacts répétés et les rails inversés dans les épingles.
 
 La collision contre les rails est simulée en 2D. Les protections ne sont pas des objets rigides 3D destructibles.
 
